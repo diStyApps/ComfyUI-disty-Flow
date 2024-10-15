@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link rel="icon" href="../core/media/ui/flow_logo.png" type="image/png">
+
+
+<style>
+    * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif, 'Arial Narrow', Arial;
+}
+    :root {
+        --main-bg: #181b1d;
+        --sidebar-bg: #121213;
+        --header-bg: #0c0c0d;
+        --text-color: #cba3e5;
+        --border-color: #320848;
+        --accent-color: #8621b7;
+        --hover-color: #430474;
+        --scrollbar-thumb-color: #570d7b;
+        --scrollbar-track-color: #1e1e1f;
+    }
+
+    html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #181b1d;
+    background-size: 32px 32px;
+    background-image: radial-gradient(circle, #430474 1px, transparent 1px);
+    color: #cba3e5;
+    overflow-x: hidden;
+    }
+
+
+    .container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #121213;
+    color: #fff;
+    padding-left: 50px;
+    padding-right: 50px;
+    padding-top: 10px;
+    text-align: left;
+    color: #570d7b;
+    border-bottom: 1px dashed;
+    border-color: #570d7b #570d7b;
+}
+#right-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 10px;
+    padding: 5px;
+}
+
+#Support{
+    /* padding: 10px; */
+    color: #cba3e5;
+    margin: 10px;
+    font-size: 12px;
+}
+a {
+    text-decoration: none;
+}
+.appName{
+    /* background-color: #570d7b; */
+    padding: 10px;
+    color: #cba3e5;
+    /* height: 100%; */
+    /* border-radius: 10%; */
+    border-top: 1px dashed;
+    border-left: 1px dashed;
+    border-right: 1px dashed;
+
+    border-color: #570d7b #570d7b;
+    font-size: 12px;
+}
+
+
+@keyframes animation-text {
+    0% {opacity:0;}
+    40% {opacity:0;}
+    100% { opacity:1;}
+}
+
+@keyframes animation-left {
+    from {left: 30px;}
+    to { left: -30px;}
+}
+
+@keyframes animation-right {
+    from {right: 30px;}
+    to { right: -30px;}
+}
+
+header #logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+header #img-logo {
+    padding-right: 40px;
+}
+
+header .logo-text {
+    display: inline-block;
+    position: relative; 
+    font-family: Arial; 
+    cursor: pointer;
+    color: #570d7b;
+}
+
+header .logo-text .text {
+    overflow: hidden;
+    font-size: 30px;
+    text-align: center;
+    display: inline-block;
+    animation-name: animation-text;
+    animation-duration: 2s;
+}
+
+header .left {
+    position: absolute;
+    left: -30px;
+    font-size: 30px;
+    line-height: 30px;
+    animation-name: animation-left;
+    animation-duration: 1.5s;
+    font-weight: bold;
+}
+
+header .right {
+    position: absolute;
+    right: -30px;
+    font-size: 30px;
+    line-height: 30px;
+    animation-name: animation-right;
+    animation-duration: 1.5s;
+    font-weight: bold;
+}
+
+
+    #logo {
+        display: flex;
+        align-items: center;
+    }
+
+    #img-logo img {
+        height: 40px;
+        margin-right: 10px;
+    }
+
+    .logo-text {
+        font-size: 1.5em;
+        font-weight: bold;
+    }
+
+    #status {
+        font-size: 0.9em;
+    }
+
+    .main-wrapper {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        width: 250px;
+        background-color: var(--sidebar-bg);
+        overflow-y: auto;
+        padding: 20px 0;
+        border-right: 1px solid var(--border-color);
+    }
+
+    .menu-category {
+        margin-bottom: 15px;
+    }
+
+    .menu-category > span {
+        display: block;
+        padding: 10px 20px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        font-weight: bold;
+    }
+
+    .menu-category > span:hover {
+        background-color: var(--hover-color);
+    }
+
+    .menu-category > span i {
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
+    }
+
+    .submenu {
+        display: none;
+        padding-left: 30px;
+    }
+
+    .submenu a {
+        display: block;
+        padding: 8px 10px;
+        color: var(--text-color);
+        text-decoration: none;
+        transition: background-color 0.3s;
+    }
+
+    .submenu a:hover {
+        background-color: var(--hover-color);
+    }
+
+    .content {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+    }
+
+    .mid-col {
+        /* flex: 1;
+        overflow-y: auto;
+        padding: 20px; */
+        padding: 10px;
+        flex: 1;
+        background-color: var(--background-color);
+        /* border: 1px solid var(--border-color); */
+        border-radius: 5px;
+        height: 100%;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);        
+    }
+
+    .app-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 20px;
+        justify-content: start;
+    }
+
+    .app-card {
+        width: 250px;
+        background-color: var(--sidebar-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        transition: transform 0.3s, box-shadow 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit; 
+        display: block; 
+    }
+
+    .app-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(134, 33, 183, 0.4);
+    }
+
+    .app-card img {
+        width: 100%;
+        height: 150px;
+        object-fit: contain;
+        background-color: #1e1e1f;
+    }
+
+    .app-card-content {
+        padding: 15px;
+    }
+
+    .app-card h3 {
+        margin: 0 0 10px;
+        color: var(--text-color);
+        font-size: 1em;
+
+    }
+
+    .app-card p {
+        font-size: 0.8em;
+        color: #a18aaf;
+        margin: 0;
+    }
+
+    .right-col {
+        width: 200px;
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    footer {
+        background-color: var(--header-bg);
+        color: var(--text-color);
+        text-align: center;
+        padding: 10px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .mid-col::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .mid-col::-webkit-scrollbar-track {
+        background: var(--scrollbar-track-color);
+        border-radius: 4px;
+    }
+
+    .mid-col::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb-color);
+    border-radius: 4px;
+    border: 2px solid var(--scrollbar-track-color);
+    }
+
+    .mid-col::-webkit-scrollbar-thumb:hover {
+        background-color: var(--hover-background-color);
+    }
+
+
+    @media (max-width: 1200px) {
+        .right-col {
+            width: 150px;
+        }
+    }
+
+    @media (max-width: 992px) {
+        .main-wrapper {
+            flex-direction: column;
+        }
+        .sidebar {
+            width: 100%;
+            border-right: none;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .content {
+            flex-direction: column;
+        }
+        .right-col {
+            width: 100%;
+            padding: 10px 20px;
+        }
+    }
+    footer {
+    background-color: #121213;
+    color: #570d7b;
+    padding: 15px 50px;
+    text-align: center;
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    border-top: 1px dashed #570d7b;
+    margin-top: auto;
+}
+</style>
+</head>
+<body >
+<div class="container">
+    <header></header>
+    <div class="main-wrapper">
+        <nav class="sidebar">
+            <div class="menu-category">
+                <!-- <span><i class="fas fa-cogs"></i> Settings</span> -->
+                <!-- <div class="submenu">
+                    <a href="#Preferences">Preferences</a>
+                    <a href="#About">About</a>
+                </div> -->
+            </div>
+        </nav>
+        
+        <div class="content">
+            <div class="mid-col">
+                <div class="app-grid" id="appGrid">
+                </div>
+            </div>
+            <!-- <div class="right-col">
+            </div> -->
+        </div>
+    </div>
+    <footer>
+        <p id="copyright"></p>
+    </footer>
+</div>
+<script type="module">
+import { initializeMenu, loadApps } from '/flow/js/main.js';
+import { insertElement } from './core/js/common/components/header.js';
+document.addEventListener('DOMContentLoaded', () => {
+    initializeMenu();
+    loadApps();
+    insertElement();
+});
+</script>
+</body>
+</html>

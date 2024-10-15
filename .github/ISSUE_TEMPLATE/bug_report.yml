@@ -1,0 +1,74 @@
+name: Bug Report
+description: Something is not right with the Flow.
+title: "[Bug]: "
+labels: ["bug-report"]
+
+body:
+  - type: checkboxes
+    attributes:
+      label: Where is the issue?
+      description: Is the issue in the "Custom Node 'Flow'" UI, or does it concern a specific flow?
+      options:
+        - label: The issue is with the "Custom Node 'Flow'"
+        - label: The issue is with a specific flow. Please refer to [Flows repository](https://github.com/diStyApps/flows_lib) if the problem lies with a specific flow.
+        - label: I’m not sure where the issue is
+
+  - type: markdown
+    attributes:
+      value: |
+        *Please provide detailed information to help us resolve the issue. Screenshots and logs are highly appreciated.*
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the issue you're encountering.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Step-by-step instructions to reproduce the issue
+      description: Be as specific as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: Describe what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current Behavior
+      description: Describe what is currently happening instead.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Flow Version or Commit
+      description: "Specify the version or commit of Flow you're using. Avoid 'Latest Version'—instead, provide the exact version (e.g., v1.0.1)."
+    validations:
+      required: true
+
+  - type: textarea
+    id: media-logs
+    attributes:
+      label: Media and Logs
+      description: Please provide any relevant media or logs to help diagnose the issue. If the logs are long, consider sharing via Pastebin or a similar service.
+      render: Shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Include any other relevant information or context that may help.
