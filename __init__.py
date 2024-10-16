@@ -10,6 +10,8 @@ from aiohttp import web
 import server
 import sys
 import stat
+import mimetypes
+mimetypes.add_type('application/javascript', '.js')
 WEBROOT = Path(__file__).parent / "web"
 FLOWS_PATH = WEBROOT / "flows"
 CORE_PATH = WEBROOT / "core"
@@ -26,7 +28,7 @@ NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 APP_CONFIGS: List[AppConfig] = []
 APP_NAME: str = "Flow"
-APP_VERSION: str = "0.1.0"
+APP_VERSION: str = "0.1.1"
 PURPLE = "\033[38;5;129m"
 RESET = "\033[0m"
 FLOWMSG = f"{PURPLE}Flow{RESET}"
@@ -297,6 +299,7 @@ def setup_server() -> None:
         AppManager.setup_app_routes(server_instance.app)
     except Exception as e:
         logger.error(f"{FLOWMSG}: Failed to set up app routes: {e}")
+    
     try:
         server_instance.app.router.add_get('/api/apps', apps_handler)
         server_instance.app.router.add_get('/api/extension-node-map', extension_node_map_handler)
