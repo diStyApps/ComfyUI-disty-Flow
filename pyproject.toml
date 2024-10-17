@@ -9,6 +9,6 @@ Repository = "https://github.com/diStyApps/ComfyUI-disty-Flow"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "disty"
 DisplayName = "ComfyUI-disty-Flow"
 Icon = ""
