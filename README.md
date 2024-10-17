@@ -137,8 +137,9 @@ distty@gmail.com
 
 [SEAIT](https://github.com/diStyApps/seait)
 
-[VisionCrafter](https://github.com/diStyApps/VisionCrafter)
+[ComfyUI_FrameMaker](https://github.com/diStyApps/ComfyUI_FrameMaker)
 
+[VisionCrafter](https://github.com/diStyApps/VisionCrafter)
 
 [FaceSwapSuite](https://github.com/diStyApps/FaceSwapSuite)
 
