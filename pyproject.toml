@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-disty-flow"
 description = "Flow is a custom node designed to provide a more user-friendly interface for ComfyUI by acting as an alternative user interface for running workflows. It is not a replacement for workflow creation.\nFlow is currently in the early stages of development, so expect bugs and ongoing feature enhancements. With your support and feedback, Flow will settle into a steady stream."
-version = "0.1.1"
+version = "0.1.2"
 license = {file = "LICENSE"}
 
 [project.urls]

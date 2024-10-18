@@ -28,7 +28,7 @@ NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 APP_CONFIGS: List[AppConfig] = []
 APP_NAME: str = "Flow"
-APP_VERSION: str = "0.1.1"
+APP_VERSION: str = "0.1.2"
 PURPLE = "\033[38;5;129m"
 RESET = "\033[0m"
 FLOWMSG = f"{PURPLE}Flow{RESET}"
@@ -70,9 +70,11 @@ class AppManager:
                         except Exception as e:
                             logger.error(f"{FLOWMSG}: Error setting up routes for {item}: {e}")
                     else:
-                        logger.warning(f"{FLOWMSG}: No conf.json found in {item}, skipping.")
+                        # logger.warning(f"{FLOWMSG}: No conf.json found in {item}, skipping.")
+                        pass
                 else:
-                    logger.debug(f"{FLOWMSG}: {item} is not a directory, skipping.")
+                    # logger.debug(f"{FLOWMSG}: {item} is not a directory, skipping.")
+                    pass
         except Exception as e:
             logger.error(f"{FLOWMSG}: Failed to iterate over flows directory: {e}")
 
