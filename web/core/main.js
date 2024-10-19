@@ -2,7 +2,7 @@ import Seeder from "./js/common/components/Seeder.js"
 import Stepper from "./js/common/components/Stepper.js"
 import MultiStepper from "./js/common/components/MultiStepper.js"
 import DropdownStepper  from "./js/common/components/DropdownStepper.js"
-import DimensionSelector from './js/common/components/DimensionSelector.js';
+import DimensionSelector from './js/common/components/DimSelector.js';
 import Dropdown from './js/common/components/Dropdown.js';
 import imageLoaderComp from './js/common/components/imageLoaderComp.js';
 import { uuidv4, showSpinner, hideSpinner } from './js/common/components/utils.js';
