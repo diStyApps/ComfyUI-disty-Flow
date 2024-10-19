@@ -20,6 +20,7 @@ const categoryKeywords = [
     'Schnell',
     'GGUF',
     'Pulid',
+    'CogVideoX',
 ];
 
 class PreferencesManager {
