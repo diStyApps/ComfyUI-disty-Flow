@@ -3,7 +3,7 @@ import { showSpinner, hideSpinner } from './utils.js';
 export default class ImageLoader {
   static DEFAULT_CONFIG = {
     allowedFileType: 'video',
-    defaultImageSrc: '../core/media/ui/drop_image_rect_no_border.png',
+    defaultImageSrc: '../core/media/ui/drop_image_rect_no_border_trans.png',
     showIndicator: false,
   };
 

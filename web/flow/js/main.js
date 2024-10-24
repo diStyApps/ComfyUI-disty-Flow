@@ -1,3 +1,7 @@
+import { PreferencesManager } from '/core/js/common/scripts/preferences.js';
+import ThemeManager from '/core/js/common/scripts/ThemeManager.js';
+import injectStylesheet from '/core/js/common/scripts/injectStylesheet.js';
+
 let allFlows = [];
 let categories = [];
 let selectedCategories = new Set();
@@ -6,8 +10,16 @@ let hideTitles = false;
 let favorites = new Set();
 let favoritesFilterActive = false;
 const FAVORITES_KEY = 'FlowFavorites';
-const PREFS_KEY = 'FlowMenuPref';
 const openInNewTab = false;
+const priorityFlowIds = [
+    'flupdate',
+    'fltuts',
+    'flbsdt2i',
+    'flbsdi2i',
+    'flbfxdt2i',
+    'flbfxdi2i',
+    'flbfxst2i',
+]; 
 const categoryKeywords = [
     'Base',
     'Stable Diffusion',
@@ -22,59 +34,20 @@ const categoryKeywords = [
     'Pulid',
     'CogVideoX',
 ];
-
-class PreferencesManager {
-    constructor(defaultPrefs) {
-        this.preferences = { ...defaultPrefs };
-        this.loadPreferences();
-    }
-
-    loadPreferences() {
-        const storedPrefs = localStorage.getItem(PREFS_KEY);
-        if (storedPrefs) {
-            try {
-                const parsedPrefs = JSON.parse(storedPrefs);
-                this.preferences = { ...this.preferences, ...parsedPrefs };
-            } catch (e) {
-                console.error('Error parsing preferences from localStorage:', e);
-            }
-        }
-    }
-
-    savePreferences() {
-        try {
-            localStorage.setItem(PREFS_KEY, JSON.stringify(this.preferences));
-        } catch (e) {
-            console.error('Error saving preferences to localStorage:', e);
-        }
-    }
-
-    get(prefKey) {
-        return this.preferences[prefKey];
-    }
-
-    set(prefKey, value) {
-        this.preferences[prefKey] = value;
-        this.savePreferences();
-    }
-
-    addPreference(prefKey, defaultValue) {
-        if (!(prefKey in this.preferences)) {
-            this.preferences[prefKey] = defaultValue;
-            this.savePreferences();
-        }
-    }
-}
-
 const defaultPreferences = {
     selectedCategories: [],
     favoritesFilterActive: false,
     hideDescriptions: false,
     hideTitles: false,
-    sortValue: 'nameAsc'
+    sortValue: 'nameAsc',
+    selectedTheme: null // Will be set by ThemeManager
 };
-
+// injectStylesheet('/flow/css/main.css', 'main');
+// injectStylesheet('/core/css/themes.css', 'themes-stylesheet');
 const preferencesManager = new PreferencesManager(defaultPreferences);
+// const themeManager = new ThemeManager(preferencesManager);
+// themeManager.init();
+// themeManager.addMenu();
 
 function loadFavorites() {
     const storedFavorites = localStorage.getItem(FAVORITES_KEY);
@@ -101,16 +74,14 @@ function toggleFavorite(flowId, button) {
     if (favorites.has(flowId)) {
         favorites.delete(flowId);
         button.classList.remove('favorited');
-        button.innerHTML = '<i class="far fa-star"></i>'; 
+        button.innerHTML = '<i class="far fa-star"></i>';
     } else {
         favorites.add(flowId);
         button.classList.add('favorited');
         button.innerHTML = '<i class="fas fa-star"></i>';
     }
     saveFavorites();
-    if (preferencesManager.get('favoritesFilterActive')) {
-        renderFlows(filterCurrentFlows());
-    }
+    animateFlowReorder();
 }
 
 const createElement = (type, className, textContent = '') => {
@@ -140,8 +111,8 @@ function createFlowCard(flow) {
     }
 
     favoriteButton.addEventListener('click', (event) => {
-        event.preventDefault(); 
-        event.stopPropagation(); 
+        event.preventDefault();
+        event.stopPropagation();
         toggleFavorite(flow.id, favoriteButton);
     });
 
@@ -154,6 +125,9 @@ function createFlowCard(flow) {
     `;
 
     card.appendChild(favoriteButton);
+
+    // Attach a unique identifier to the card for animation purposes
+    card.dataset.flowId = flow.id;
 
     return card;
 }
@@ -261,14 +235,11 @@ function createToggleButtons() {
     favoritesToggle.title = favoritesFilterActive ? 'Show All Flows' : 'Show Favorites';
 }
 
-
 function toggleFavoritesFilter(button) {
     favoritesFilterActive = !favoritesFilterActive;
     preferencesManager.set('favoritesFilterActive', favoritesFilterActive);
     button.classList.toggle('active', favoritesFilterActive);
-    
     button.title = favoritesFilterActive ? 'Show All Flows' : 'Show Favorites';
-    
     renderFlows(filterCurrentFlows());
 }
 
@@ -321,6 +292,7 @@ function filterCurrentFlows() {
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     const sortValue = preferencesManager.get('sortValue') || 'nameAsc';
     let filteredFlows = filterFlows(allFlows, searchTerm, selectedCategories);
+    
     if (favoritesFilterActive) {
         filteredFlows = filteredFlows.filter(flow => isFavorited(flow.id));
     }
@@ -338,7 +310,37 @@ function renderFlows(flows) {
             flowGrid.appendChild(flowCard);
         }
     });
-    updateFlowCardVisibility(); 
+    updateFlowCardVisibility();
+}
+
+function animateFlowReorder() {
+    const flowGrid = document.getElementById('flowGrid');
+    const oldPositions = new Map();
+    Array.from(flowGrid.children).forEach(card => {
+        const rect = card.getBoundingClientRect();
+        oldPositions.set(card.dataset.flowId, rect);
+    });
+
+    renderFlows(filterCurrentFlows());
+
+    Array.from(flowGrid.children).forEach(card => {
+        const oldRect = oldPositions.get(card.dataset.flowId);
+        const newRect = card.getBoundingClientRect();
+
+        const deltaX = oldRect.left - newRect.left;
+        const deltaY = oldRect.top - newRect.top;
+        card.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        card.offsetHeight;
+        card.style.transition = 'transform 0.5s ease';
+        card.style.transform = '';
+    });
+
+    setTimeout(() => {
+        Array.from(flowGrid.children).forEach(card => {
+            card.style.transition = '';
+            card.style.transform = '';
+        });
+    }, 500);
 }
 
 export async function showVersion() {
@@ -380,7 +382,6 @@ function initializeSearch() {
 
 function initializeSorting() {
     const sortSelect = document.getElementById('sortSelect');
-    
     const savedSortValue = preferencesManager.get('sortValue') || 'nameAsc';
     sortSelect.value = savedSortValue;
     
@@ -422,12 +423,46 @@ function sortFlows(flows, sortValue) {
             break;
     }
 
-    // Ensure the 'flupdate' Flow Card is always first if it exists in the filtered flows
-    const flupdateIndex = sortedFlows.findIndex(flow => flow.id === 'flupdate');
-    if (flupdateIndex > -1) {
-        const [flupdateFlow] = sortedFlows.splice(flupdateIndex, 1);
-        sortedFlows.unshift(flupdateFlow);
-    }
+    const topPriorityIds = ['flupdate', 'fltuts'];
+    const topPriorityFlows = [];
+    const remainingFlows = [];
+
+    sortedFlows.forEach(flow => {
+        if (topPriorityIds.includes(flow.id)) {
+            topPriorityFlows.push(flow);
+        } else {
+            remainingFlows.push(flow);
+        }
+    });
+
+    const favoriteFlows = [];
+    const nonFavoriteFlows = [];
+
+    remainingFlows.forEach(flow => {
+        if (isFavorited(flow.id)) {
+            favoriteFlows.push(flow);
+        } else {
+            nonFavoriteFlows.push(flow);
+        }
+    });
+
+    const otherPriorityIds = priorityFlowIds.filter(id => !topPriorityIds.includes(id));
+    const otherPriorityFlows = [];
+    const restFlows = [];
+
+    nonFavoriteFlows.forEach(flow => {
+        if (otherPriorityIds.includes(flow.id)) {
+            otherPriorityFlows.push(flow);
+        } else {
+            restFlows.push(flow);
+        }
+    });
+
+    otherPriorityFlows.sort((a, b) => {
+        return otherPriorityIds.indexOf(a.id) - otherPriorityIds.indexOf(b.id);
+    });
+
+    sortedFlows = [...topPriorityFlows, ...favoriteFlows, ...otherPriorityFlows, ...restFlows];
 
     return sortedFlows;
 }
@@ -507,15 +542,20 @@ function initializeFilterMenu() {
 }
 
 export function initializeUI() {
-    loadFavorites(); 
+    loadFavorites();
     initializeMenu();
     initializeSearch();
     initializeSorting();
     initializeFilterMenu();
-    createToggleButtons(); 
+    createToggleButtons();
     loadFlows();
     showVersion();
 }
 
 const styleElement = document.createElement('style');
+styleElement.textContent = `
+.flow-card {
+    transition: transform 0.5s ease;
+}
+`;
 document.head.appendChild(styleElement);

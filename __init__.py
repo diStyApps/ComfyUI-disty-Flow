@@ -11,16 +11,21 @@ import server
 import sys
 import stat
 import mimetypes
+
 mimetypes.add_type('application/javascript', '.js')
+
 WEBROOT = Path(__file__).parent / "web"
 FLOWS_PATH = WEBROOT / "flows"
 CORE_PATH = WEBROOT / "core"
 FLOWER_PATH = WEBROOT / "flower"
 FLOW_PATH = WEBROOT / "flow"
+CUSTOM_THEMES_DIR = WEBROOT / 'custom-themes'  # Updated
 CUSTOM_NODES_DIR = Path(__file__).parent.parent
 EXTENSION_NODE_MAP_PATH = Path(__file__).parent.parent / "ComfyUI-Manager" / "extension-node-map.json"
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 AppConfig = Dict[str, Any]
 Routes = web.RouteTableDef
 FLOWS_DOWNLOAD_PATH = 'https://github.com/diStyApps/flows_lib'
@@ -32,7 +37,7 @@ APP_VERSION: str = "0.1.2"
 PURPLE = "\033[38;5;129m"
 RESET = "\033[0m"
 FLOWMSG = f"{PURPLE}Flow{RESET}"
-
+ALLOWED_EXTENSIONS = {'css'}
 
 class RouteManager:
     @staticmethod
@@ -79,6 +84,9 @@ class AppManager:
             logger.error(f"{FLOWMSG}: Failed to iterate over flows directory: {e}")
 
         if CORE_PATH.is_dir():
+            # Add the specific handlers before the general static route
+            app.router.add_get('/core/css/themes/list', list_themes_handler)
+            app.router.add_get('/core/css/themes/{filename}', get_theme_css_handler)
             app.router.add_static('/core/', path=CORE_PATH, name='core')
 
         if FLOWER_PATH.is_dir():
@@ -174,7 +182,6 @@ async def update_package_handler(request: web.Request) -> web.Response:
         return web.json_response({'status': 'error', 'message': f"An error occurred while updating package '{package_name}': {e}"}, status=500)
 
 def remove_readonly(func, path, excinfo):
-    # This makes the file writable and retries the removal
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
@@ -195,7 +202,6 @@ async def uninstall_package_handler(request: web.Request) -> web.Response:
     try:
         logger.info(f"{FLOWMSG}: Uninstalling custom node '{package_name}'...")
 
-        # Attempt to remove the directory with retry and handling of access errors
         shutil.rmtree(install_path, onerror=remove_readonly)
         logger.info(f"{FLOWMSG}: Custom node '{package_name}' uninstalled successfully.")
 
@@ -236,38 +242,75 @@ async def save_config_handler(request: web.Request) -> web.Response:
         logger.error(f"{FLOWMSG}: Error saving configuration: {e}")
         return web.Response(status=500, text=f"{FLOWMSG}: Error saving configuration: {str(e)}")
 
+if not CUSTOM_THEMES_DIR.exists():
+    try:
+        CUSTOM_THEMES_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created custom-themes directory at {CUSTOM_THEMES_DIR}")
+    except Exception as e:
+        logger.error(f"Failed to create custom-themes directory: {e}")
+
+def allowed_file(filename: str) -> bool:
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+async def list_themes_handler(request: web.Request) -> web.Response:
+    themes_dir = CUSTOM_THEMES_DIR  
+    try:
+        if not themes_dir.exists():
+            logger.warning(f"Custom themes directory does not exist: {themes_dir}")
+            return web.json_response([], status=200)
+        
+        css_files = [file.name for file in themes_dir.iterdir() if file.is_file() and allowed_file(file.name)]
+        return web.json_response(css_files)
+    
+    except Exception as e:
+        logger.error(f"Error listing theme files: {e}")
+        return web.json_response({'error': 'Failed to list theme files.'}, status=500)
+
+async def get_theme_css_handler(request: web.Request) -> web.Response:
+    filename = request.match_info.get('filename')
+    
+    if not allowed_file(filename):
+        logger.warning(f"Attempt to access disallowed file type: {filename}")
+        raise web.HTTPNotFound()
+    
+    themes_dir = CUSTOM_THEMES_DIR 
+    file_path = themes_dir / filename
+    
+    if not file_path.exists() or not file_path.is_file():
+        logger.warning(f"CSS file not found: {file_path}")
+        raise web.HTTPNotFound()
+    
+    try:
+        return web.FileResponse(path=file_path)
+    except Exception as e:
+        logger.error(f"Error serving CSS file '{filename}': {e}")
+        raise web.HTTPInternalServerError(text="Internal Server Error")
+
 def download_or_update_flows() -> None:
     try:
         with tempfile.TemporaryDirectory() as tmpdirname:
             temp_repo_path = Path(tmpdirname) / "Flows"
-            # logger.info(f"{FLOWMSG}:Cloning flows repository into temporary directory {temp_repo_path}")
             logger.info(f"{FLOWMSG}: Downloading Flows")
 
             result = subprocess.run(['git', 'clone', FLOWS_DOWNLOAD_PATH, str(temp_repo_path)],
                                     capture_output=True, text=True)
             if result.returncode != 0:
                 logger.error(f"{FLOWMSG}: Failed to clone flows repository:\n{result.stderr}")
-
                 return
             else:
-                # logger.info(f"{FLOWMSG}: Flows repository cloned successfully into {temp_repo_path}")
                 pass
             if not FLOWS_PATH.exists():
                 FLOWS_PATH.mkdir(parents=True)
-                # logger.info(f"{FLOWMSG}: Created flows directory at {FLOWS_PATH}")
             for item in temp_repo_path.iterdir():
-                if item.name == '.git':
+                if item.name in ['.git', '.github']:
                     continue
                 dest_item = FLOWS_PATH / item.name
                 if item.is_dir():
                     if dest_item.exists():
-                        # logger.info(f"{FLOWMSG}: Updating existing directory {dest_item}")
                         _copy_directory(item, dest_item)
                     else:
-                        # logger.info(f"{FLOWMSG}: Copying new directory {item.name} to {dest_item}")
                         shutil.copytree(item, dest_item)
                 else:
-                    # logger.info(f"{FLOWMSG}: Copying file {item.name} to {dest_item}")
                     shutil.copy2(item, dest_item)
             logger.info(f"{FLOWMSG}: Flows have been updated successfully.")
     except Exception as e:
@@ -275,7 +318,7 @@ def download_or_update_flows() -> None:
 
 def _copy_directory(src: Path, dest: Path) -> None:
     for item in src.iterdir():
-        if item.name == '.git':
+        if item.name in ['.git', '.github']:
             continue
         dest_item = dest / item.name
         if item.is_dir():

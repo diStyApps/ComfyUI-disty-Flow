@@ -35,7 +35,7 @@ export default function imageLoaderComp(flowConfig, workflow) {
         const containerId = loadImageContainer.id;
         const imageLoader = new ImageLoader(containerId, {
             allowedFileType: 'image',
-            defaultImageSrc: '../core/media/ui/drop_image_rect_no_border.png',
+            defaultImageSrc: '../core/media/ui/drop_image_rect_no_border_trans.png',
             showIndicator: true,
         }, (localSrc, serverResult) => {
             console.log(`Image ${index + 1} loaded:`, serverResult);

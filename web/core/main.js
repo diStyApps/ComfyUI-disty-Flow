@@ -1,3 +1,4 @@
+
 import Seeder from "./js/common/components/Seeder.js"
 import Stepper from "./js/common/components/Stepper.js"
 import MultiStepper from "./js/common/components/MultiStepper.js"
@@ -12,6 +13,9 @@ import { processWorkflowNodes } from './js/common/scripts/nodesscanner.js';
 import { fetchWorkflow } from './js/common/scripts/fetchWorkflow.js'; 
 import { fetchflowConfig } from './js/common/scripts/fetchflowConfig.js'; 
 import { setFaviconStatus } from './js/common/scripts/favicon.js'; 
+import { PreferencesManager } from './js/common/scripts/preferences.js';
+import ThemeManager from './js/common/scripts/ThemeManager.js';
+import injectStylesheet from './js/common/scripts/injectStylesheet.js';
 
 import { checkAndShowMissingPackagesDialog } from './js/common/components/missingPackagesDialog.js';
 
@@ -26,10 +30,28 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     let isProcessing = false;
     initializeWebSocket(client_id);
     setFaviconStatus.Default();
-    
+    injectStylesheet('/core/css/main.css', 'main');
+    injectStylesheet('/core/css/themes.css', 'themes-stylesheet');
+
     console.log("flowConfig",flowConfig)
     console.log("workflow",workflow)
     
+
+    const defaultPreferences = {
+        selectedCategories: [],
+        favoritesFilterActive: false,
+        hideDescriptions: false,
+        hideTitles: false,
+        sortValue: 'nameAsc',
+        selectedTheme: null 
+    };
+    
+    const preferencesManager = new PreferencesManager(defaultPreferences);
+
+    ThemeManager.applyInitialTheme(preferencesManager);
+    const themeManager = new ThemeManager(preferencesManager);
+    themeManager.init();
+
     function generateWorkflowControls(config) {
         const container = document.getElementById('side-workflow-controls');
 
@@ -76,7 +98,6 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         });
     }
 
-      
     function generateWorkflowInputs(config, options = { clearInputs: false }) {
         const promptsContainer = document.getElementById('prompts');
         config.workflowInputs.forEach((input, index) => {
@@ -141,6 +162,7 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     flowConfig.multiSteppers.forEach(config => {
         new MultiStepper(config, workflow);
     });
+
     flowConfig.dropdownSteppers.forEach(config => {
         new DropdownStepper(config, workflow);
     });
@@ -255,6 +277,13 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         interrupt();
     });
 
-
-        
+    document.addEventListener('DOMContentLoaded', () => {
+        const overlay = document.getElementById('css-loading-overlay');
+        overlay.classList.add('fade-out');
+    
+        overlay.addEventListener('transitionend', () => {
+            overlay.style.display = 'none';
+        });
+    });
+    
 })(window, document, undefined);
