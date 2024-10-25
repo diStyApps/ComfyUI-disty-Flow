@@ -58,7 +58,10 @@ Flow is a custom node designed to provide user-friendly interface for ComfyUI by
 
 Flow is currently in the early stages of development, so expect bugs and ongoing feature enhancements. With your support and feedback, Flow will settle into a steady stream.
 
+
 <img src="web/core/media/git/flow_3.jpg">
+
+<img src="web/core/media/git/flow_4.jpg">
 
 <img src="web/core/media/git/flow_1.jpg">
 
