@@ -105,7 +105,7 @@ http://127.0.0.1:8188/flow
 ### Feature Support
 - [ ] Inpainting Functionality
 - [ ] Enhanced Media Handling
-- [ ] Live Preview
+- [x] Live Preview
 - [ ] Prompt Tracking
 
 ### UI/UX Enhancements
