@@ -11,6 +11,7 @@ import server
 import sys
 import stat
 import mimetypes
+import re
 
 mimetypes.add_type('application/javascript', '.js')
 
@@ -18,8 +19,10 @@ WEBROOT = Path(__file__).parent / "web"
 FLOWS_PATH = WEBROOT / "flows"
 CORE_PATH = WEBROOT / "core"
 FLOWER_PATH = WEBROOT / "flower"
+LINKER_PATH = WEBROOT / "linker"
+
 FLOW_PATH = WEBROOT / "flow"
-CUSTOM_THEMES_DIR = WEBROOT / 'custom-themes'  # Updated
+CUSTOM_THEMES_DIR = WEBROOT / 'custom-themes'
 CUSTOM_NODES_DIR = Path(__file__).parent.parent
 EXTENSION_NODE_MAP_PATH = Path(__file__).parent.parent / "ComfyUI-Manager" / "extension-node-map.json"
 
@@ -33,11 +36,12 @@ NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 APP_CONFIGS: List[AppConfig] = []
 APP_NAME: str = "Flow"
-APP_VERSION: str = "0.1.3"
+APP_VERSION: str = "0.1.4"
 PURPLE = "\033[38;5;129m"
 RESET = "\033[0m"
 FLOWMSG = f"{PURPLE}Flow{RESET}"
 ALLOWED_EXTENSIONS = {'css'}
+SAFE_FOLDER_NAME_REGEX = re.compile(r'^[\w\-]+$')
 
 class RouteManager:
     @staticmethod
@@ -93,9 +97,15 @@ class AppManager:
             flow_builder_routes = RouteManager.create_routes('flow/flower', FLOWER_PATH)
             app.add_routes(flow_builder_routes)
 
+        if LINKER_PATH.is_dir():
+            flow_builder_routes = RouteManager.create_routes('flow/linker', LINKER_PATH)
+            app.add_routes(flow_builder_routes)
+
         if FLOW_PATH.is_dir():
             flow_routes = RouteManager.create_routes('flow', FLOW_PATH)
             app.add_routes(flow_routes)
+
+
 
     @staticmethod
     def _load_config(conf_file: Path) -> Dict[str, Any]:
@@ -225,7 +235,7 @@ async def installed_custom_nodes_handler(request: web.Request) -> web.Response:
 async def save_config_handler(request: web.Request) -> web.Response:
     try:
         data = await request.json()
-        flow_id = "afl_aflower"
+        flow_id = "afl_aaafllinker"
         if not flow_id:
             return web.Response(status=400, text="Missing 'id' in request body")
 
@@ -241,6 +251,71 @@ async def save_config_handler(request: web.Request) -> web.Response:
     except Exception as e:
         logger.error(f"{FLOWMSG}: Error saving configuration: {e}")
         return web.Response(status=500, text=f"{FLOWMSG}: Error saving configuration: {str(e)}")
+
+
+async def create_flow_handler(request: web.Request) -> web.Response:
+    try:
+        reader = await request.multipart()
+        flow_config = None
+        wf_file = None
+        flow_url = None
+
+        while True:
+            part = await reader.next()
+            if part is None:
+                break
+
+            if part.name == 'flowConfig':
+                flow_config_content = await part.read(decode=True)
+                flow_config = json.loads(flow_config_content)
+                flow_url = flow_config.get('url', None)
+                if not flow_url:
+                    return web.Response(status=400, text="Missing 'url' in 'flowConfig'")
+            elif part.name == 'wf':
+                wf_file_content = await part.read(decode=True)
+                wf_file = wf_file_content
+            else:
+                pass  # Handle other parts if necessary
+
+        if not flow_config or not wf_file:
+            return web.Response(status=400, text="Missing 'flowConfig' or 'wf' in request")
+
+        # Validate flow_url to prevent directory traversal and ensure it's a safe folder name
+        if not SAFE_FOLDER_NAME_REGEX.match(flow_url):
+            return web.Response(status=400, text="Invalid 'url' in 'flowConfig'. Only letters, numbers, dashes, and underscores are allowed.")
+
+        # Create the flow directory
+        flow_folder = FLOWS_PATH / flow_url
+        if flow_folder.exists():
+            return web.Response(status=400, text=f"Flow with url '{flow_url}' already exists")
+
+        flow_folder.mkdir(parents=True, exist_ok=False)
+
+        # Save 'flowConfig.json'
+        flow_config_path = flow_folder / 'flowConfig.json'
+        with flow_config_path.open('w') as f:
+            json.dump(flow_config, f, indent=2)
+
+        # Save 'wf.json'
+        wf_json_path = flow_folder / 'wf.json'
+        with wf_json_path.open('wb') as f:
+            f.write(wf_file)
+
+        # Copy 'index.html' from core/templates
+        index_template_path = CORE_PATH / 'templates' / 'index.html'
+        if not index_template_path.exists():
+            return web.Response(status=500, text="Template 'index.html' not found")
+        index_destination_path = flow_folder / 'index.html'
+        shutil.copy2(index_template_path, index_destination_path)
+
+        logger.info(f"{FLOWMSG}: Flow '{flow_url}' created successfully.")
+        return web.json_response({'status': 'success', 'message': f"Flow '{flow_url}' created successfully."})
+
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error creating flow: {e}")
+        return web.Response(status=500, text=f"{FLOWMSG}: Error creating flow: {str(e)}")
+
+
 
 if not CUSTOM_THEMES_DIR.exists():
     try:
@@ -353,6 +428,8 @@ def setup_server() -> None:
         server_instance.app.router.add_post('/api/uninstall-package', uninstall_package_handler)        
         server_instance.app.router.add_get('/api/flow-version', app_version_handler)
         server_instance.app.router.add_post('/api/save-config', save_config_handler)
+        server_instance.app.router.add_post('/api/create-flow', create_flow_handler)
+
     except Exception as e:
         logger.error(f"{FLOWMSG}: Failed to add API routes: {e}")
 

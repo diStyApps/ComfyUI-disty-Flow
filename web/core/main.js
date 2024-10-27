@@ -131,7 +131,7 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     }
     
     generateWorkflowControls(flowConfig); 
-    generateWorkflowInputs(flowConfig);
+    generateWorkflowInputs(flowConfig,true);
 
     processWorkflowNodes(workflow).then(({ nodeToCustomNodeMap, uniqueCustomNodesArray, missingNodes, missingCustomPackages }) => {
         console.log("Node to Custom Node Mapping:", nodeToCustomNodeMap);
@@ -172,24 +172,22 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     async function queue() {
         flowConfig.workflowInputs.forEach(pathConfig => {
             const { id } = pathConfig;
-            const element = document.getElementById(id.toLowerCase());
+            const element = document.getElementById(id); // Removed .toLowerCase()
             if (element) {
                 const value = element.value.replace(/(\r\n|\n|\r)/gm, " ");
                 updateWorkflowValue(workflow, id, value, flowConfig);
-                console.log("queued workflow",workflow)
-
+                console.log("queued workflow", workflow);
             } else {
                 console.warn(`Element not found for ID: ${id}`);
             }
         });
         
         const jobId = ++currentJobId;
-        const job = { id: jobId, workflow: {...workflow} };
+        const job = { id: jobId, workflow: { ...workflow } };
         jobQueue.push(job);
         console.log(`Added job to queue. Job ID: ${jobId}`);
         console.log("Current queue:", jobQueue);
-        // const queueCountElement = document.getElementById('queue-display');
-        // queueCountElement.textContent = jobId
+        
         if (!isProcessing) {
             processQueue();
         }
@@ -285,5 +283,4 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             overlay.style.display = 'none';
         });
     });
-    
 })(window, document, undefined);

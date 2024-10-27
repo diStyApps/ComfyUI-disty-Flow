@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title></title>
+<link rel="stylesheet" href="/core/css/main.css">
+</head>
+<body>
+    <div id="container" class="container"></div>
+    <script>
+        const loadAppContent = async () => {
+            try {
+                const response = await fetch('/core/content.html');
+                const bodyContent = await response.text();
+                document.getElementById('container').innerHTML = bodyContent;
+                loadAppScripts();
+            } catch (error) {
+                console.error('Error loading app body:', error);
+            }
+        };
+        const loadAppScripts = () => {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = '/core/loadScripts.js';
+            document.head.appendChild(script);
+        };
+        loadAppContent();
+    </script>
+</body>
+</html>

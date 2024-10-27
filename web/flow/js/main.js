@@ -20,20 +20,24 @@ const priorityFlowIds = [
     'flbfxdi2i',
     'flbfxst2i',
 ]; 
+
 const categoryKeywords = [
     'Base',
-    'Stable Diffusion',
-    'Flux',
     'Image to Image',
     'Image to Video',
     'Video',
     'Image',
+    'Stable Diffusion',
+    'Flux',
     'Flux Dev',
     'Schnell',
+    'Lora',
+    'VAE',
     'GGUF',
     'Pulid',
     'CogVideoX',
 ];
+
 const defaultPreferences = {
     selectedCategories: [],
     favoritesFilterActive: false,
