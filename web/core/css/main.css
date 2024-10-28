@@ -1350,3 +1350,18 @@ html:not(.css-loading) body {
     max-height: 100%;
     border: 1px dashed var(--color-border);
 }
+
+.add-lora-button {
+    background-color: var(--color-button-secondary);
+    color: var(--color-button-secondary-text);
+    /* padding: 10px; */
+    /* margin: 0 10px; */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    width: 100%;
+}
+.add-lora-button:hover {
+    background-color: var(--color-button-secondary-hover);
+    color: var(--color-button-secondary-text-hover);
+}

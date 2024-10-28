@@ -14,6 +14,7 @@ class DropdownStepper {
 
         this.createDropdown();
         this.createSteppers();
+        // console.log('DropdownStepper initialized:', config);
     }
 
     createDropdown() {

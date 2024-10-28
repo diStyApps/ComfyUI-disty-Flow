@@ -1,8 +1,7 @@
-
 import Seeder from "./js/common/components/Seeder.js"
 import Stepper from "./js/common/components/Stepper.js"
 import MultiStepper from "./js/common/components/MultiStepper.js"
-import DropdownStepper  from "./js/common/components/DropdownStepper.js"
+import DropdownStepper from "./js/common/components/DropdownStepper.js"
 import DimensionSelector from './js/common/components/DimSelector.js';
 import Dropdown from './js/common/components/Dropdown.js';
 import imageLoaderComp from './js/common/components/imageLoaderComp.js';
@@ -22,8 +21,8 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
 (async (window, document, undefined) => {
 
     const client_id = uuidv4();
-    const flowConfig  = await fetchflowConfig();
-    const workflow = await fetchWorkflow();
+    const flowConfig = await fetchflowConfig();
+    let workflow = await fetchWorkflow();
     const seeders = [];
     let jobQueue = [];
     let currentJobId = 0;
@@ -33,9 +32,8 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     injectStylesheet('/core/css/main.css', 'main');
     injectStylesheet('/core/css/themes.css', 'themes-stylesheet');
 
-    console.log("flowConfig",flowConfig)
-    console.log("workflow",workflow)
-    
+    console.log("flowConfig", flowConfig)
+    console.log("workflow", workflow)
 
     const defaultPreferences = {
         selectedCategories: [],
@@ -51,6 +49,183 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     ThemeManager.applyInitialTheme(preferencesManager);
     const themeManager = new ThemeManager(preferencesManager);
     themeManager.init();
+
+
+    class LoraWorkflowManager {
+
+        constructor(workflow, flowConfig) {
+            this.workflowManager = new WorkflowNodeAdder(workflow);
+            this.flowConfig = flowConfig;
+            this.container = document.getElementById('side-workflow-controls');
+            this.addButton = null;
+            this.initializeUI();
+        }
+
+        initializeUI() {
+            this.addButton = document.createElement('button');
+            this.addButton.textContent = 'Add LoRA';
+            this.addButton.classList.add('add-lora-button'); 
+            this.addButton.style.marginBottom = '10px';
+            this.container.appendChild(this.addButton); 
+
+            this.addButton.addEventListener('click', () => this.handleAddLora());
+            // this.flowConfig.dropdownSteppers.forEach(dropdownStepperConfig => {
+            //     new DropdownStepper(dropdownStepperConfig, workflow);
+            // });
+
+            // this.flowConfig.dropdownSteppers.forEach(dropdownStepper => {
+            //     const div = document.createElement('div');
+            //     div.id = dropdownStepper.id;
+            //     div.classList.add('dropdown-stepper-container');
+            //     this.container.appendChild(div);
+            // });
+        }
+
+        handleAddLora() {
+            try {
+                const newNodeId = this.workflowManager.addLora();
+
+                const dynamicConfig = this.createDynamicConfig(newNodeId);
+
+                const loraContainer = document.createElement('div');
+                loraContainer.id = dynamicConfig.id;
+                loraContainer.classList.add('dropdown-stepper-container');
+                this.container.appendChild(loraContainer);
+
+                new DropdownStepper(dynamicConfig, this.workflowManager.getWorkflow());
+
+                // console.log(`LoRA added with Node ID: ${newNodeId}`);
+            } catch (error) {
+                console.error('Error adding LoRA:', error);
+            }
+        }
+
+        createDynamicConfig(nodeId) {
+            return {
+                id: `LoraLoader_${nodeId}`,
+                label: "LoRA",
+                dropdown: {
+                    url: "LoraLoaderModelOnly",
+                    key: "lora_name",
+                    nodePath: `${nodeId}.inputs.lora_name`
+                },
+                steppers: [
+                    {
+                        id: `lorastrength_${nodeId}`,
+                        label: "Strength",
+                        minValue: 0,
+                        maxValue: 5,
+                        step: 0.01,
+                        defValue: 1,
+                        precision: 2,
+                        scaleFactor: 1,
+                        container: `lorastrength_container_${nodeId}`,
+                        nodePath: `${nodeId}.inputs.strength_model`
+                    }
+                ]
+            };
+        }
+
+        getWorkflow() {
+            return this.workflowManager.getWorkflow();
+        }
+    }
+
+    class WorkflowNodeAdder {
+
+        constructor(workflow) {
+            if (typeof workflow !== 'object' || workflow === null || Array.isArray(workflow)) {
+                throw new TypeError('Workflow must be a non-null object');
+            }
+            this.workflow = { ...workflow };
+            this.existingIds = new Set(Object.keys(this.workflow).map(id => parseInt(id, 10)));
+            this.highestId = this._getHighestNodeId();
+            this.loraCount = this._countExistingLoras();
+        }
+      
+        addLora() {
+            const newLoraId = this._getNextNodeId();
+            const loraNode = this._createLoraNode(newLoraId);
+      
+            const existingLoras = this._findLoraNodes();
+      
+            if (existingLoras.length === 0) {
+                const modelLoaders = this._findModelLoaders();
+                if (modelLoaders.length === 0) {
+                    throw new Error('No model loader found in the workflow to attach LoRA');
+                }
+      
+                modelLoaders.forEach(loader => {
+                    const originalModelInput = loader.inputs.model;
+                    loader.inputs.model = [newLoraId.toString(), 0];
+                    loraNode.inputs.model = originalModelInput;
+                });
+            } else {
+                const lastLora = existingLoras[existingLoras.length - 1];
+                const originalModelInput = lastLora.inputs.model;
+                lastLora.inputs.model = [newLoraId.toString(), 0];
+                loraNode.inputs.model = originalModelInput;
+            }
+      
+            this.workflow[newLoraId.toString()] = loraNode;
+            this.existingIds.add(newLoraId);
+            this.highestId = newLoraId;
+            this.loraCount += 1;
+
+            return newLoraId;
+        }
+
+        getWorkflow() {
+            return this.workflow;
+        }
+      
+        _createLoraNode(id) {
+            return {
+                inputs: {
+                    lora_name: "lora.safetensors",
+                    strength_model: 1,
+                    model: []
+                },
+                class_type: "LoraLoaderModelOnly",
+                _meta: {
+                    title: "LoraLoaderModelOnly"
+                }
+            };
+        }
+      
+
+        _findLoraNodes() {
+            return Object.entries(this.workflow)
+                .filter(([_, node]) => node.class_type === "LoraLoaderModelOnly")
+                .map(([id, node]) => ({ id: parseInt(id, 10), ...node }));
+        }
+      
+        _findModelLoaders() {
+            const modelLoaders = [];
+      
+            Object.entries(this.workflow).forEach(([id, node]) => {
+                if (node.inputs && Array.isArray(node.inputs.model) && node.inputs.model.length === 2) {
+                    modelLoaders.push({ id: parseInt(id, 10), ...node });
+                }
+            });
+      
+            return modelLoaders;
+        }
+      
+        _getNextNodeId() {
+            return this.highestId + 1;
+        }
+      
+        _getHighestNodeId() {
+            return Math.max(...this.existingIds, 0);
+        }
+      
+        _countExistingLoras() {
+            return this._findLoraNodes().length;
+        }
+    }
+
+
 
     function generateWorkflowControls(config) {
         const container = document.getElementById('side-workflow-controls');
@@ -121,7 +296,7 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             promptsContainer.appendChild(titleDiv);
         });
     }
-    
+
     function generateDynamicScriptDefault(index) {
         const defaultsPrompts = [
             'A cartoon happy goat with purple eyes and a black horn in the jungle',
@@ -129,19 +304,19 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         ];
         return defaultsPrompts[index] || ''; 
     }
-    
-    generateWorkflowControls(flowConfig); 
-    generateWorkflowInputs(flowConfig,true);
 
+    generateWorkflowControls(flowConfig); 
+    generateWorkflowInputs(flowConfig, true);
+    const loraWorkflowManager = new LoraWorkflowManager(workflow, flowConfig);
+    workflow = loraWorkflowManager.getWorkflow();
     processWorkflowNodes(workflow).then(({ nodeToCustomNodeMap, uniqueCustomNodesArray, missingNodes, missingCustomPackages }) => {
         console.log("Node to Custom Node Mapping:", nodeToCustomNodeMap);
         console.log("Unique Custom Nodes:", uniqueCustomNodesArray);
         console.log("Missing Nodes:", missingNodes);
         console.log("Missing Custom Packages:", missingCustomPackages);
-        checkAndShowMissingPackagesDialog(missingCustomPackages, missingNodes,flowConfig);
+        checkAndShowMissingPackagesDialog(missingCustomPackages, missingNodes, flowConfig);
     });
 
-    
     flowConfig.dimensionSelectors.forEach(config => {
         new DimensionSelector(config, workflow);
     });
@@ -167,12 +342,12 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         new DropdownStepper(config, workflow);
     });
     
-    imageLoaderComp(flowConfig,workflow);
+    imageLoaderComp(flowConfig, workflow);
 
     async function queue() {
         flowConfig.workflowInputs.forEach(pathConfig => {
             const { id } = pathConfig;
-            const element = document.getElementById(id); // Removed .toLowerCase()
+            const element = document.getElementById(id);
             if (element) {
                 const value = element.value.replace(/(\r\n|\n|\r)/gm, " ");
                 updateWorkflowValue(workflow, id, value, flowConfig);
@@ -224,6 +399,12 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
                 body: JSON.stringify(data)
             });
 
+            if (!response.ok) {
+                throw new Error('Failed to process prompt.');
+            }
+
+            const result = await response.json();
+            // console.log('Prompt processed:', result);
         } catch (error) {
             console.error('Error processing prompt:', error);
             throw error;
@@ -283,4 +464,5 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             overlay.style.display = 'none';
         });
     });
+
 })(window, document, undefined);
