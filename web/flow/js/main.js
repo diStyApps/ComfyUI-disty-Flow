@@ -14,11 +14,14 @@ const openInNewTab = false;
 const priorityFlowIds = [
     'flupdate',
     'fltuts',
-    'flbsdt2i',
-    'flbsdi2i',
-    'flbfxdt2i',
-    'flbfxdi2i',
-    'flbfxst2i',
+    '2m1x4',
+    'afoye',
+    '30kk2',
+    'n0y8e',
+    'yigqn',
+    '12slf',
+
+    
 ]; 
 
 const categoryKeywords = [
@@ -36,6 +39,8 @@ const categoryKeywords = [
     'GGUF',
     'Pulid',
     'CogVideoX',
+    'Mochi'
+    
 ];
 
 const defaultPreferences = {
@@ -99,13 +104,16 @@ function createFlowCard(flow) {
     const card = createElement('a', 'flow-card');
     card.href = `flow/${flow.url}`;
    
-    if (openInNewTab) {
+    if (flow.url === 'linker') {
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+    } else if (openInNewTab) {
         card.target = "_blank";
         card.rel = "noopener noreferrer";
     }
 
     let thumbnailUrl = `flow/${flow.url}/media/thumbnail.jpg`;
-    let defaultThumbnail = '../core/media/ui/flow_logo.png';
+    let defaultThumbnail = '/core/media/ui/flow_logo.png';
 
     const favoriteButton = document.createElement('button');
     favoriteButton.classList.add('favorite-button');
@@ -129,10 +137,7 @@ function createFlowCard(flow) {
     `;
 
     card.appendChild(favoriteButton);
-
-    // Attach a unique identifier to the card for animation purposes
     card.dataset.flowId = flow.id;
-
     return card;
 }
 
@@ -193,6 +198,7 @@ export async function loadFlows() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         allFlows = await response.json();
+        console.log('allFlows', allFlows);
         allFlows = assignCategories(allFlows);
         categories = updateGlobalCategories(allFlows);
         updateFilterMenu();
@@ -427,16 +433,25 @@ function sortFlows(flows, sortValue) {
             break;
     }
 
-    const topPriorityIds = ['flupdate', 'fltuts'];
+    const topPriorityIds = [
+        'flupdate', 
+        'linker', 
+        'fltuts'
+    
+    ];
     const topPriorityFlows = [];
     const remainingFlows = [];
-
+    
     sortedFlows.forEach(flow => {
         if (topPriorityIds.includes(flow.id)) {
             topPriorityFlows.push(flow);
         } else {
             remainingFlows.push(flow);
         }
+    });
+    
+    topPriorityFlows.sort((a, b) => {
+        return topPriorityIds.indexOf(a.id) - topPriorityIds.indexOf(b.id);
     });
 
     const favoriteFlows = [];

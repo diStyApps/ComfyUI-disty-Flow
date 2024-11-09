@@ -12,7 +12,9 @@ import sys
 import stat
 import mimetypes
 import re
-
+import base64
+from PIL import Image
+from io import BytesIO
 mimetypes.add_type('application/javascript', '.js')
 
 WEBROOT = Path(__file__).parent / "web"
@@ -36,7 +38,7 @@ NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 APP_CONFIGS: List[AppConfig] = []
 APP_NAME: str = "Flow"
-APP_VERSION: str = "0.1.5"
+APP_VERSION: str = "0.2.0"
 PURPLE = "\033[38;5;129m"
 RESET = "\033[0m"
 FLOWMSG = f"{PURPLE}Flow{RESET}"
@@ -88,7 +90,7 @@ class AppManager:
             logger.error(f"{FLOWMSG}: Failed to iterate over flows directory: {e}")
 
         if CORE_PATH.is_dir():
-            # Add the specific handlers before the general static route
+            
             app.router.add_get('/core/css/themes/list', list_themes_handler)
             app.router.add_get('/core/css/themes/{filename}', get_theme_css_handler)
             app.router.add_static('/core/', path=CORE_PATH, name='core')
@@ -232,79 +234,284 @@ async def installed_custom_nodes_handler(request: web.Request) -> web.Response:
         logger.error(f"{FLOWMSG}: Error fetching installed custom nodes: {e}")
         return web.Response(status=500, text="Internal Server Error")
 
-async def save_config_handler(request: web.Request) -> web.Response:
+async def preview_flow_handler(request: web.Request) -> web.Response:
     try:
-        data = await request.json()
-        flow_id = "afl_aaafllinker"
-        if not flow_id:
-            return web.Response(status=400, text="Missing 'id' in request body")
-
-        flow_path = FLOWS_PATH / flow_id
-        if not flow_path.exists():
-            return web.Response(status=404, text=f"Flow directory '{flow_id}' not found")
-
-        config_path = flow_path / 'flowConfig.json'
-        with config_path.open('w') as f:
-            json.dump(data, f, indent=2)
-
-        return web.json_response({'status': 'success', 'message': f"Configuration for flow '{flow_id}' saved successfully."})
-    except Exception as e:
-        logger.error(f"{FLOWMSG}: Error saving configuration: {e}")
-        return web.Response(status=500, text=f"{FLOWMSG}: Error saving configuration: {str(e)}")
-
-
-async def create_flow_handler(request: web.Request) -> web.Response:
-    try:
+        
         reader = await request.multipart()
         flow_config = None
         wf_file = None
-        flow_url = None
+        thumbnail_data = None
+        thumbnail_extension = None
 
+        
         while True:
             part = await reader.next()
             if part is None:
                 break
 
             if part.name == 'flowConfig':
+                
                 flow_config_content = await part.read(decode=True)
-                flow_config = json.loads(flow_config_content)
+                try:
+                    flow_config = json.loads(flow_config_content)
+                except json.JSONDecodeError:
+                    return web.Response(status=400, text="Invalid JSON format in 'flowConfig'")
+                
                 flow_url = flow_config.get('url', None)
                 if not flow_url:
                     return web.Response(status=400, text="Missing 'url' in 'flowConfig'")
-            elif part.name == 'wf':
-                wf_file_content = await part.read(decode=True)
-                wf_file = wf_file_content
-            else:
-                pass  # Handle other parts if necessary
 
+            elif part.name == 'wf':
+                
+                wf_file = await part.read(decode=False)  
+
+            elif part.name == 'thumbnail':
+                
+                thumbnail_str = await part.text()
+                
+                match = re.match(r'data:(image/\w+);base64,(.+)', thumbnail_str)
+                if match:
+                    mime_type = match.group(1)          
+                    base64_data = match.group(2)
+                    thumbnail_extension = mime_type.split('/')[1]  
+
+                    try:
+                        thumbnail_data = base64.b64decode(base64_data)
+                    except base64.binascii.Error:
+                        return web.Response(status=400, text="Invalid Base64 encoding in 'thumbnail'")
+                else:
+                    return web.Response(status=400, text="Invalid data URL format for 'thumbnail'")
+
+            else:
+                
+                pass
+
+        
+        logger.debug(f"{FLOWMSG} thumbnail_data: {thumbnail_data is not None}")
+
+        
         if not flow_config or not wf_file:
             return web.Response(status=400, text="Missing 'flowConfig' or 'wf' in request")
 
-        # Validate flow_url to prevent directory traversal and ensure it's a safe folder name
+        
+        flow_id = "linker"
+
+        
+        if not flow_id:
+            return web.Response(status=400, text="Missing 'id' in request body")
+
+        
+        if not SAFE_FOLDER_NAME_REGEX.match(flow_id):
+            return web.Response(status=400, text="Invalid 'flow_id'. Only letters, numbers, dashes, and underscores are allowed.")
+
+        
+        flow_path = WEBROOT / flow_id
+
+        
+        if not flow_path.exists():
+            return web.Response(status=404, text=f"Flow directory '{flow_id}' not found")
+
+        
+        config_path = flow_path / 'flowConfig.json'
+        with config_path.open('w', encoding='utf-8') as f:
+            json.dump(flow_config, f, indent=2)
+
+        
+        if wf_file:
+            wf_json_path = flow_path / 'wf.json'
+            with wf_json_path.open('wb') as f:
+                f.write(wf_file)
+
+        
+        if thumbnail_data and thumbnail_extension:
+            thumbnail_filename = f"thumbnail.{thumbnail_extension}"
+            thumbnail_path = flow_path / thumbnail_filename
+            with thumbnail_path.open('wb') as f:
+                f.write(thumbnail_data)
+            
+            
+            flow_config['thumbnail'] = thumbnail_filename
+            with config_path.open('w', encoding='utf-8') as f:
+                json.dump(flow_config, f, indent=2)
+
+            logger.info(f"Thumbnail saved as '{thumbnail_filename}' in flow '{flow_id}'")
+
+        
+        return web.json_response({
+            'status': 'success',
+            'message': f"Configuration for previewing flow '{flow_id}' saved successfully.",
+            'thumbnail': f"thumbnail.{thumbnail_extension}" if thumbnail_extension else None
+        })
+
+    except Exception as e:
+        
+        logger.error(f"{FLOWMSG}: Error saving configuration: {e}")
+        return web.Response(status=500, text=f"{FLOWMSG}: Error saving configuration: {str(e)}")
+    
+async def reset_preview_handler(request: web.Request) -> web.Response:
+    try:
+        
+        flow_id = "linker"
+
+        
+        flow_path = WEBROOT / flow_id
+
+        
+        if not flow_path.exists():
+            return web.Response(status=404, text=f"Flow directory '{flow_id}' not found")
+
+        
+        defwf_path = flow_path / 'defwf.json'
+        wf_path = flow_path / 'wf.json'
+        def_flow_config_path = flow_path / 'defFlowConfig.json'
+        flow_config_path = flow_path / 'flowConfig.json'
+
+        
+        if not defwf_path.exists():
+            return web.Response(status=404, text=f"Default workflow file 'defwf.json' not found in '{flow_id}'")
+
+        
+        if not def_flow_config_path.exists():
+            return web.Response(status=404, text=f"Default flow configuration file 'defFlowConfig.json' not found in '{flow_id}'")
+
+        
+        shutil.copy2(defwf_path, wf_path)
+
+        
+        shutil.copy2(def_flow_config_path, flow_config_path)
+
+        logger.info(f"{FLOWMSG}: Preview reset successfully for flow '{flow_id}'.")
+        return web.json_response({
+            'status': 'success',
+            'message': f"Preview has been reset successfully for flow '{flow_id}'."
+        })
+
+    except Exception as e:
+        
+        logger.error(f"{FLOWMSG}: Error resetting preview: {e}")
+        return web.Response(status=500, text=f"{FLOWMSG}: Error resetting preview: {str(e)}")
+
+async def create_flow_handler(request: web.Request) -> web.Response:
+    try:
+        
+        reader = await request.multipart()
+        flow_config = None
+        wf_file = None
+        flow_url = None
+        thumbnail_data = None
+
+        
+        while True:
+            part = await reader.next()
+            if part is None:
+                break
+
+            if part.name == 'flowConfig':
+                
+                flow_config_content = await part.read(decode=True)
+                try:
+                    flow_config = json.loads(flow_config_content)
+                except json.JSONDecodeError:
+                    return web.Response(status=400, text="Invalid JSON format in 'flowConfig'")
+                
+                flow_url = flow_config.get('url', None)
+                if not flow_url:
+                    return web.Response(status=400, text="Missing 'url' in 'flowConfig'")
+
+            elif part.name == 'wf':
+                
+                wf_file = await part.read(decode=False)  
+
+            elif part.name == 'thumbnail':
+                
+                thumbnail_str = await part.text()
+                
+                match = re.match(r'data:(image/\w+);base64,(.+)', thumbnail_str)
+                if match:
+                    mime_type = match.group(1)          
+                    base64_data = match.group(2)
+                    
+                    try:
+                        thumbnail_bytes = base64.b64decode(base64_data)
+                        
+                        image = Image.open(BytesIO(thumbnail_bytes))
+                        
+                        if image.mode in ("RGBA", "P"):
+                            image = image.convert("RGB")
+                        
+                        width_percent = (468 / float(image.size[0]))
+                        new_height = int((float(image.size[1]) * float(width_percent)))
+                        
+                        image = image.resize((468, new_height), Image.Resampling.LANCZOS)
+                        
+                        buffered = BytesIO()
+                        image.save(buffered, format="JPEG")
+                        thumbnail_data = buffered.getvalue()
+                    except Exception as e:
+                        logger.error(f"{FLOWMSG}: Error processing thumbnail: {e}")
+                        return web.Response(status=400, text="Invalid image data in 'thumbnail'")
+                else:
+                    return web.Response(status=400, text="Invalid data URL format for 'thumbnail'")
+
+            else:
+                
+                pass
+
+        
+        logger.debug(f"{FLOWMSG} thumbnail_data: {thumbnail_data is not None}")
+
+        
+        if not flow_config or not wf_file:
+            return web.Response(status=400, text="Missing 'flowConfig' or 'wf' in request")
+
+        
         if not SAFE_FOLDER_NAME_REGEX.match(flow_url):
             return web.Response(status=400, text="Invalid 'url' in 'flowConfig'. Only letters, numbers, dashes, and underscores are allowed.")
 
-        # Create the flow directory
+        
         flow_folder = FLOWS_PATH / flow_url
         if flow_folder.exists():
             return web.Response(status=400, text=f"Flow with url '{flow_url}' already exists")
 
         flow_folder.mkdir(parents=True, exist_ok=False)
 
-        # Save 'flowConfig.json'
+        
         flow_config_path = flow_folder / 'flowConfig.json'
-        with flow_config_path.open('w') as f:
+        with flow_config_path.open('w', encoding='utf-8') as f:
             json.dump(flow_config, f, indent=2)
 
-        # Save 'wf.json'
-        wf_json_path = flow_folder / 'wf.json'
-        with wf_json_path.open('wb') as f:
-            f.write(wf_file)
+        
+        if wf_file:
+            wf_json_path = flow_folder / 'wf.json'
+            with wf_json_path.open('wb') as f:
+                f.write(wf_file)
 
-        # Copy 'index.html' from core/templates
+        
+        if thumbnail_data:
+            
+            media_folder = flow_folder / 'media'
+            media_folder.mkdir(exist_ok=True)
+
+            
+            thumbnail_filename = "thumbnail.jpg"
+            thumbnail_path = media_folder / thumbnail_filename
+
+            
+            with thumbnail_path.open('wb') as f:
+                f.write(thumbnail_data)
+
+            
+            
+            with flow_config_path.open('w', encoding='utf-8') as f:
+                json.dump(flow_config, f, indent=2)
+
+            logger.info(f"Thumbnail saved as '{thumbnail_filename}' in flow '{flow_url}'")
+
+        
         index_template_path = CORE_PATH / 'templates' / 'index.html'
         if not index_template_path.exists():
             return web.Response(status=500, text="Template 'index.html' not found")
+        
         index_destination_path = flow_folder / 'index.html'
         shutil.copy2(index_template_path, index_destination_path)
 
@@ -315,7 +522,153 @@ async def create_flow_handler(request: web.Request) -> web.Response:
         logger.error(f"{FLOWMSG}: Error creating flow: {e}")
         return web.Response(status=500, text=f"{FLOWMSG}: Error creating flow: {str(e)}")
 
+async def update_flow_handler(request: web.Request) -> web.Response:
+    try:
+        
+        reader = await request.multipart()
+        flow_config = None
+        wf_file = None
+        flow_url = None
+        thumbnail_data = None
 
+        
+        while True:
+            part = await reader.next()
+            if part is None:
+                break
+
+            if part.name == 'flowConfig':
+                
+                flow_config_content = await part.read(decode=True)
+                try:
+                    flow_config = json.loads(flow_config_content)
+                except json.JSONDecodeError:
+                    return web.Response(status=400, text="Invalid JSON format in 'flowConfig'")
+                
+                flow_url = flow_config.get('url', None)
+                if not flow_url:
+                    return web.Response(status=400, text="Missing 'url' in 'flowConfig'")
+
+            elif part.name == 'wf':
+                
+                wf_file = await part.read(decode=False)  
+
+            elif part.name == 'thumbnail':
+                
+                thumbnail_str = await part.text()
+                
+                match = re.match(r'data:(image/\w+);base64,(.+)', thumbnail_str)
+                if match:
+                    mime_type = match.group(1)          
+                    base64_data = match.group(2)
+                    
+                    try:
+                        thumbnail_bytes = base64.b64decode(base64_data)
+                        
+                        image = Image.open(BytesIO(thumbnail_bytes))
+                        
+                        if image.mode in ("RGBA", "P"):
+                            image = image.convert("RGB")
+                        
+                        width_percent = (468 / float(image.size[0]))
+                        new_height = int((float(image.size[1]) * float(width_percent)))
+                        
+                        image = image.resize((468, new_height), Image.Resampling.LANCZOS)
+                        
+                        buffered = BytesIO()
+                        image.save(buffered, format="JPEG")
+                        thumbnail_data = buffered.getvalue()
+                    except Exception as e:
+                        logger.error(f"{FLOWMSG}: Error processing thumbnail: {e}")
+                        return web.Response(status=400, text="Invalid image data in 'thumbnail'")
+                else:
+                    return web.Response(status=400, text="Invalid data URL format for 'thumbnail'")
+
+            else:
+                
+                pass
+
+        
+        logger.debug(f"{FLOWMSG} thumbnail_data: {thumbnail_data is not None}")
+
+        
+        if not flow_config:
+            return web.Response(status=400, text="Missing 'flowConfig' in request")
+
+        
+        if not SAFE_FOLDER_NAME_REGEX.match(flow_url):
+            return web.Response(status=400, text="Invalid 'url' in 'flowConfig'. Only letters, numbers, dashes, and underscores are allowed.")
+
+        
+        flow_folder = FLOWS_PATH / flow_url
+        if not flow_folder.exists():
+            return web.Response(status=400, text=f"Flow with url '{flow_url}' does not exist")
+
+        
+        flow_config_path = flow_folder / 'flowConfig.json'
+        with flow_config_path.open('w', encoding='utf-8') as f:
+            json.dump(flow_config, f, indent=2)
+
+        
+        if wf_file:
+            wf_json_path = flow_folder / 'wf.json'
+            with wf_json_path.open('wb') as f:
+                f.write(wf_file)
+
+        
+        if thumbnail_data:
+            
+            media_folder = flow_folder / 'media'
+            media_folder.mkdir(exist_ok=True)
+
+            
+            thumbnail_filename = "thumbnail.jpg"
+            thumbnail_path = media_folder / thumbnail_filename
+
+            
+            with thumbnail_path.open('wb') as f:
+                f.write(thumbnail_data)
+
+            
+            
+            with flow_config_path.open('w', encoding='utf-8') as f:
+                json.dump(flow_config, f, indent=2)
+
+            logger.info(f"Thumbnail updated as '{thumbnail_filename}' in flow '{flow_url}'")
+
+        
+        
+
+        logger.info(f"{FLOWMSG}: Flow '{flow_url}' updated successfully.")
+        return web.json_response({'status': 'success', 'message': f"Flow '{flow_url}' updated successfully."})
+
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error updating flow: {e}")
+        return web.Response(status=500, text=f"{FLOWMSG}: Error updating flow: {str(e)}")
+        
+async def delete_flow_handler(request: web.Request) -> web.Response:
+    try:
+        flow_url = request.query.get('url', None)
+        if not flow_url:
+            return web.Response(status=400, text="Missing 'url' parameter")
+
+        
+        if not SAFE_FOLDER_NAME_REGEX.match(flow_url):
+            return web.Response(status=400, text="Invalid 'url' parameter.")
+
+        flow_folder = FLOWS_PATH / flow_url
+        if not flow_folder.exists():
+            return web.Response(status=400, text=f"Flow with url '{flow_url}' does not exist")
+
+        
+        shutil.rmtree(flow_folder)
+
+        logger.info(f"{FLOWMSG}: Flow '{flow_url}' deleted successfully.")
+        return web.json_response({'status': 'success', 'message': f"Flow '{flow_url}' deleted successfully."})
+
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error deleting flow: {e}")
+        return web.Response(status=500, text=f"{FLOWMSG}: Error deleting flow: {str(e)}")
 
 if not CUSTOM_THEMES_DIR.exists():
     try:
@@ -409,12 +762,10 @@ def setup_server() -> None:
     except Exception as e:
         logger.error(f"{FLOWMSG}: Failed to get server instance: {e}")
         return
-
     try:
         download_or_update_flows()
     except Exception as e:
-        logger.error(f"{FLOWMSG}: Failed to download or update flows: {e}")
-
+        logger.error(f"{FLOWMSG}: Failed to download or update flows: {e}")    
     try:
         AppManager.setup_app_routes(server_instance.app)
     except Exception as e:
@@ -427,8 +778,12 @@ def setup_server() -> None:
         server_instance.app.router.add_post('/api/update-package', update_package_handler)
         server_instance.app.router.add_post('/api/uninstall-package', uninstall_package_handler)        
         server_instance.app.router.add_get('/api/flow-version', app_version_handler)
-        server_instance.app.router.add_post('/api/save-config', save_config_handler)
+        server_instance.app.router.add_post('/api/preview-flow', preview_flow_handler)
+        server_instance.app.router.add_post('/api/reset-preview', reset_preview_handler)
         server_instance.app.router.add_post('/api/create-flow', create_flow_handler)
+        server_instance.app.router.add_post('/api/update-flow', update_flow_handler)
+        server_instance.app.router.add_delete('/api/delete-flow', delete_flow_handler)
+
 
     except Exception as e:
         logger.error(f"{FLOWMSG}: Failed to add API routes: {e}")

@@ -1,3 +1,6 @@
+import MultiComponent from './js/common/components/MultiComponent.js';
+import InputComponent from "./js/common/components/InputComponent.js"
+import ToggleComponent from "./js/common/components/ToggleComponent.js"
 import Seeder from "./js/common/components/Seeder.js"
 import Stepper from "./js/common/components/Stepper.js"
 import MultiStepper from "./js/common/components/MultiStepper.js"
@@ -20,9 +23,41 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
 
 (async (window, document, undefined) => {
 
+    function getFlowName() {
+        const scripts = document.getElementsByTagName('script');
+        for (let script of scripts) {
+            if (script.src && script.src.includes('main.js')) {
+                try {
+                    const url = new URL(script.src, window.location.origin);
+                    const flowParam = url.searchParams.get('flow');
+                    if (flowParam) {
+                        console.log('Flow name from script src:', flowParam);
+                        return flowParam;
+                    }
+                } catch (e) {
+                    console.error('Error parsing script src URL:', e);
+                }
+            }
+        }
+        const paths = window.location.pathname.split('/').filter(Boolean);
+        if (paths[0] === 'flow' && paths[1]) {
+            console.log('Flow name from URL path:', paths[1]);
+            return paths[1];
+        }
+        // Default flow name
+        console.log('Default flow name: linker');
+        return 'linker';
+    }
+    
+    const flowName = getFlowName();
+
     const client_id = uuidv4();
-    const flowConfig = await fetchflowConfig();
-    let workflow = await fetchWorkflow();
+    const flowConfig = await fetchflowConfig(flowName);
+    let workflow = await fetchWorkflow(flowName);
+
+    // const client_id = uuidv4();
+    // const flowConfig = await fetchflowConfig();
+    // let workflow = await fetchWorkflow();
     const seeders = [];
     let jobQueue = [];
     let currentJobId = 0;
@@ -63,22 +98,11 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
 
         initializeUI() {
             this.addButton = document.createElement('button');
-            this.addButton.textContent = 'Add LoRA';
+            this.addButton.textContent = '+LoRA';
             this.addButton.classList.add('add-lora-button'); 
-            this.addButton.style.marginBottom = '10px';
+            // this.addButton.style.marginBottom = '10px';
             this.container.appendChild(this.addButton); 
-
             this.addButton.addEventListener('click', () => this.handleAddLora());
-            // this.flowConfig.dropdownSteppers.forEach(dropdownStepperConfig => {
-            //     new DropdownStepper(dropdownStepperConfig, workflow);
-            // });
-
-            // this.flowConfig.dropdownSteppers.forEach(dropdownStepper => {
-            //     const div = document.createElement('div');
-            //     div.id = dropdownStepper.id;
-            //     div.classList.add('dropdown-stepper-container');
-            //     this.container.appendChild(div);
-            // });
         }
 
         handleAddLora() {
@@ -91,10 +115,8 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
                 loraContainer.id = dynamicConfig.id;
                 loraContainer.classList.add('dropdown-stepper-container');
                 this.container.appendChild(loraContainer);
-
                 new DropdownStepper(dynamicConfig, this.workflowManager.getWorkflow());
 
-                // console.log(`LoRA added with Node ID: ${newNodeId}`);
             } catch (error) {
                 console.error('Error adding LoRA:', error);
             }
@@ -225,57 +247,93 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         }
     }
 
-
-
     function generateWorkflowControls(config) {
         const container = document.getElementById('side-workflow-controls');
 
-        config.dropdowns.forEach(dropdown => {
-            const div = document.createElement('div');
-            div.id = dropdown.id;
-            div.classList.add('loader');
-            container.appendChild(div);
-        });
-    
-        config.steppers.forEach(stepper => {
-            const div = document.createElement('div');
-            div.id = stepper.id;
-            div.classList.add('stepper-container');
-            container.appendChild(div);
-        });
+        console.log("config", config)
 
-        config.dimensionSelectors.forEach(selector => {
-            const div = document.createElement('div');
-            div.id = selector.id;
-            div.classList.add('dimension-selector-container');
-            container.appendChild(div);
-        });
+        if (config.dropdowns && Array.isArray(config.dropdowns)) {
+            config.dropdowns.forEach(dropdown => {
+                const div = document.createElement('div');
+                div.id = dropdown.id;
+                div.classList.add('loader');
+                container.appendChild(div);
+            });
+        }
+        if (config.steppers && Array.isArray(config.steppers)) {
+            config.steppers.forEach(stepper => {
+                const div = document.createElement('div');
+                div.id = stepper.id;
+                div.classList.add('stepper-container');
+                container.appendChild(div);
+            });
+        }
 
-        config.seeders.forEach(seeder => {
-            const div = document.createElement('div');
-            div.id = seeder.id;
-            div.classList.add('stepper-container');
-            container.appendChild(div);
-        });
+        if (config.dimensionSelectors) {
+            config.dimensionSelectors.forEach(selector => {
+                const div = document.createElement('div');
+                div.id = selector.id;
+                div.classList.add('dimension-selector-container');
+                container.appendChild(div);
+            });
+        }
+        if (config.inputs && Array.isArray(config.inputs)) {
+            config.inputs.forEach(input => {
+                const div = document.createElement('div');
+                div.id = input.id;
+                div.classList.add('input-container');
+                container.appendChild(div);
+            });
+        }
 
-        config.multiSteppers.forEach(multiStepper => {
-            const div = document.createElement('div');
-            div.id = multiStepper.id;
-            div.classList.add('multi-stepper-container');
-            container.appendChild(div);
-        });
+        if (config.toggles && Array.isArray(config.toggles)) {
+            config.toggles.forEach(toggle => {
+                const div = document.createElement('div');
+                div.id = toggle.id;
+                div.classList.add('toggle-container');
+                container.appendChild(div);
+            });
+        }
 
-        config.dropdownSteppers.forEach(dropdownStepper => {
-            const div = document.createElement('div');
-            div.id = dropdownStepper.id;
-            div.classList.add('dropdown-stepper-container');
-            container.appendChild(div);
-        });
+        if (config.seeders && Array.isArray(config.seeders)) {
+            config.seeders.forEach(seeder => {
+                const div = document.createElement('div');
+                div.id = seeder.id;
+                div.classList.add('seeder-container');
+                container.appendChild(div);
+            });
+        }
+
+        if (config.multiComponents && Array.isArray(config.multiComponents)) {
+            config.multiComponents.forEach(config => {
+                const div = document.createElement('div');
+                div.id = config.id;
+                div.classList.add('multi-component-container');
+            });
+        }
+
+        // if (config.multiSteppers && Array.isArray(config.multiSteppers)) {
+        //     config.multiSteppers.forEach(multiStepper => {
+        //         const div = document.createElement('div');
+        //         div.id = multiStepper.id;
+        //         div.classList.add('multi-stepper-container');
+        //         container.appendChild(div);
+        //     });
+        // }
+        // config.dropdownSteppers.forEach(dropdownStepper => {
+        //     const div = document.createElement('div');
+        //     div.id = dropdownStepper.id;
+        //     div.classList.add('dropdown-stepper-container');
+        //     container.appendChild(div);
+        // });
     }
 
-    function generateWorkflowInputs(config, options = { clearInputs: false }) {
+    function setPromptComponents(config, options = { clearInputs: false }) {
+        if  (!config.prompts || !Array.isArray(config.prompts)) {
+            return;
+        }
         const promptsContainer = document.getElementById('prompts');
-        config.workflowInputs.forEach((input, index) => {
+        config.prompts.forEach((input, index) => {
             const titleDiv = document.createElement('div');
             titleDiv.id = 'title';
     
@@ -306,9 +364,12 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     }
 
     generateWorkflowControls(flowConfig); 
-    generateWorkflowInputs(flowConfig, true);
+    setPromptComponents(flowConfig, true);
+
     const loraWorkflowManager = new LoraWorkflowManager(workflow, flowConfig);
+
     workflow = loraWorkflowManager.getWorkflow();
+    
     processWorkflowNodes(workflow).then(({ nodeToCustomNodeMap, uniqueCustomNodesArray, missingNodes, missingCustomPackages }) => {
         console.log("Node to Custom Node Mapping:", nodeToCustomNodeMap);
         console.log("Unique Custom Nodes:", uniqueCustomNodesArray);
@@ -317,51 +378,81 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         checkAndShowMissingPackagesDialog(missingCustomPackages, missingNodes, flowConfig);
     });
 
-    flowConfig.dimensionSelectors.forEach(config => {
-        new DimensionSelector(config, workflow);
-    });
+    if (flowConfig.dropdowns) {
+        flowConfig.dropdowns.forEach(config => {
+            new Dropdown(config, workflow);
+        });
+    }
 
-    flowConfig.seeders.forEach(config => {
-        const seeder = new Seeder(config, workflow);
-        seeders.push(seeder);
-    });
+    if(flowConfig.steppers) {
+        flowConfig.steppers.forEach(config => {
+            new Stepper(config, workflow);
+        });
+    }
 
-    flowConfig.steppers.forEach(config => {
-        new Stepper(config, workflow);
-    });
+    if(flowConfig.dimensionSelectors) {
+        flowConfig.dimensionSelectors.forEach(config => {
+            new DimensionSelector(config, workflow);
+        });
+    }
 
-    flowConfig.dropdowns.forEach(config => {
-        new Dropdown(config, workflow);
-    });
+    if (flowConfig.inputs) {
+        flowConfig.inputs.forEach(config => {
+            new InputComponent(config, workflow);
+        });
+    }
 
-    flowConfig.multiSteppers.forEach(config => {
-        new MultiStepper(config, workflow);
-    });
+    if(flowConfig.toggles) {
+        flowConfig.toggles.forEach(config => {
+            new ToggleComponent(config, workflow);
+        });
+    }
 
-    flowConfig.dropdownSteppers.forEach(config => {
-        new DropdownStepper(config, workflow);
-    });
+    if(flowConfig.seeders) {
+        flowConfig.seeders.forEach(config => {
+            const seeder = new Seeder(config, workflow);
+            seeders.push(seeder);
+        });
+    }
+
+    if (flowConfig.multiComponents && Array.isArray(flowConfig.multiComponents)) {
+        flowConfig.multiComponents.forEach(config => {
+            new MultiComponent(config, workflow);
+        });
+    }
+
+    // if (flowConfig.multiSteppers){
+    // flowConfig.multiSteppers.forEach(config => {
+    //     new MultiStepper(config, workflow);
+    // });
+    // }
+    // flowConfig.dropdownSteppers.forEach(config => {
+    //     new DropdownStepper(config, workflow);
+    // });
     
     imageLoaderComp(flowConfig, workflow);
 
     async function queue() {
-        flowConfig.workflowInputs.forEach(pathConfig => {
+        if(flowConfig.prompts) {
+
+        flowConfig.prompts.forEach(pathConfig => {
             const { id } = pathConfig;
             const element = document.getElementById(id);
             if (element) {
                 const value = element.value.replace(/(\r\n|\n|\r)/gm, " ");
                 updateWorkflowValue(workflow, id, value, flowConfig);
-                console.log("queued workflow", workflow);
             } else {
                 console.warn(`Element not found for ID: ${id}`);
             }
         });
-        
+    }
         const jobId = ++currentJobId;
         const job = { id: jobId, workflow: { ...workflow } };
+        console.log("queued workflow", workflow);
         jobQueue.push(job);
         console.log(`Added job to queue. Job ID: ${jobId}`);
         console.log("Current queue:", jobQueue);
+                console.log("queued workflow", workflow);
         
         if (!isProcessing) {
             processQueue();

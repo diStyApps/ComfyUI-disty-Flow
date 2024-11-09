@@ -182,6 +182,20 @@ header .right {
     font-weight: bold;
 }
 
+.menu-category > a {
+    display: block;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-weight: bold;
+    text-decoration: none;
+    color: var(--color-primary-text);
+}
+
+.menu-category > a:hover {
+    background-color: var(--color-background-pattern);
+}
+
 .menu-category > span:hover {
     background-color: var(--color-background-pattern);
 }
@@ -605,7 +619,13 @@ footer {
         <div class="main-wrapper">
             <nav class="sidebar">
                 <div class="menu-category">
-                    <!-- Menu items will be dynamically added here -->
+                <a href="flow/linker" target="_blank"><span><i class="fas fa-chain"></i> Linker</span></a>
+                <!-- <span><i class="fas fa-cogs"></i> Settings</span> -->
+                <!-- <div class="submenu">
+                    <a href="#Preferences">Preferences</a>
+                    <a href="#About">About</a>
+                </div>                -->
+               
                 </div>
                 <div id="theme-selector"></div>
 

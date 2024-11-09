@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flow Linker</title>
+    <link rel="stylesheet" href="/flow/linker/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="panel left-panel">
+
+            <div class="section loading-flows-tabs" id="loading-flows-tabs">
+                <div class="tabs">
+                    <input type="radio" name="tabs" id="tab1" checked>
+                    <input type="radio" name="tabs" id="tab2">
+                    <input type="radio" name="tabs" id="tab3">
+                    <div class="tab-labels">
+                        <label for="tab1">Load Workflow</label>
+                        <label for="tab2">Load Flow</label>
+                        <!-- <label for="tab3">Load Flow Config</label> -->
+                    </div>
+                    <div class="tab-content">
+                        <div class="tab-panel">
+                            <input type="file" id="fileInput" accept=".json">
+                        </div>
+                        
+                        <div class="tab-panel">
+                            <input type="text" id="urlInput" placeholder="Enter flow URL">
+                            <button id="urlLoadButton">Load Flow</button>
+                        </div>
+
+                        <div class="tab-panel ">
+                            <input type="file" id="flowConfigInput" accept=".json">
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+                 
+            <div class="section">
+                <h3>Flow Information</h3>
+                <input type="text" id="flowName" placeholder="Flow Name">
+                <textarea id="flowDescription" placeholder="Flow Description" rows="2"></textarea>
+                <div id="thumbnailPreview" class="thumbnail-preview">
+                    <img id="thumbnailImage" src="/core/media/ui/drop_image_rect_no_border_trans.png" alt="Thumbnail Preview">
+                    <div class="thumbnail-placeholder">Flow Thumbnail</div>
+                </div>
+                <input type="file" id="thumbnailInputHidden" accept="image/*" style="display: none;">
+            </div>
+
+            <div class="section">
+                <div class="section" id="saveOptions">
+                </div>
+                <div id="flowConfig" style="display: block;">
+                    <h3>Flow Configuration</h3>
+                    <div class="section" id="workflowConfig" >
+                </div>
+            </div>
+            </div>
+
+        </div>
+        <div class="panel middle-panel-1">
+            <div class="section">
+                <h2>Node Selection</h2>
+                <select id="nodeDropdown"></select>
+                <div id="nodeInfo"></div>
+
+            </div>
+
+            <div class="section" id="nodeToComponentSection">
+                <!-- <h2>Component Configuration</h2> -->
+            </div>
+            <div class="section">
+                <!-- <select id="nodeDropdown"></select> -->
+                <div id="nodeInfo-extra"></div>
+            </div>
+        </div>
+        <div class="panel middle-panel-2">
+            <div class="section" id="extraComponentsSection">
+                <h2>Extra Components</h2>
+                <button id="createMultiComponentButton">Create MultiComponent</button>
+            </div>
+            <div class="section" id="componentsList">
+                <h2>Added Components</h2>
+            </div>
+        </div>
+        <div class="panel right-panel" style="display: none;">
+            <div class="section" id="workflowFormat" style="display: none;">
+                <h2>Workflow Format</h2>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/flow/linker/app.js"></script>
+</body>
+</html>

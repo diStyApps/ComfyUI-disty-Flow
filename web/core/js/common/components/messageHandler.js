@@ -17,7 +17,6 @@ class JSONMessageProcessor extends IMessageProcessor {
 
     async process(jsonString) {
         try {
-            // console.log('Processing JSON message:', jsonString);
             const data = JSON.parse(jsonString);
             switch (data.type) {
                 case 'progress':
@@ -60,7 +59,6 @@ async function detectMimeType(blob) {
         '00000018': 'video/mp4',
         '00000020': 'video/mp4',
         '66747970': 'video/mp4',
-   
     };
 
     const arrayBuffer = await blob.slice(0, 8).arrayBuffer();
@@ -179,24 +177,28 @@ export class MessageHandler {
         const newImageFilenames = [];
         const imageUrls = images.map(image => {
             const { filename } = image;
-
+    
+            if (filename.includes('ComfyUI_temp')) {
+                return null;
+            }
+    
             if (this.lastImageFilenames.includes(filename)) {
                 console.log('Duplicate image:', filename);
                 return null;
             }
-
+    
             newImageFilenames.push(filename);
             const imageUrl = `/view?filename=${encodeURIComponent(filename)}`;
             console.log('Image URL:', imageUrl);
             return imageUrl;
         }).filter(url => url !== null);
-
+    
         if (imageUrls.length > 0) {
             displayImagesInDiv(imageUrls); 
             this.lastImageFilenames = newImageFilenames;
         }
     }
-
+    
     processGifs(gifs) {
         const gifUrls = gifs.map(gif => {
             const { filename } = gif;
@@ -208,12 +210,10 @@ export class MessageHandler {
         displayImagesInDiv(gifUrls); 
     }
 
-
     handleMedia(mediaUrl, mediaType, addToHistory = true) {
         // console.log('Handling media:', mediaUrl, 'Type:', mediaType, 'Add to history:', addToHistory);
         displayImagesInDiv([mediaUrl], addToHistory);
     }
-
 
     handleInterrupted() {
         hideSpinner();

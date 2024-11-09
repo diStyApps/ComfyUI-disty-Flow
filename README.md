@@ -98,7 +98,8 @@ http://127.0.0.1:8188/flow
 ## Roadmap
 
 ### Flow Customization
-- [ ] Flow Builder/Converter
+- [x] Flow Linker
+- - [ ] Improved Flow Linker
 - Expanded Flow Components
 - Enhanced Customization Options
 

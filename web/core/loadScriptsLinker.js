@@ -1,4 +1,4 @@
-import { coreScriptsPath } from '/core/js/common/scripts/corePath.js';
+import { coreScriptsPath } from '/core/js/common/scripts/corePathLinker.js';
 
 const urlParams = new URLSearchParams(window.location.search);
 const flowName = urlParams.get('flow');

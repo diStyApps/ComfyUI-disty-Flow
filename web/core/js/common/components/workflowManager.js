@@ -1,5 +1,5 @@
 export function updateWorkflowValue(workflow, pathId, value, workflowConfig) {
-    const pathConfig = workflowConfig.workflowInputs.find(path => path.id === pathId);
+    const pathConfig = workflowConfig.prompts.find(path => path.id === pathId);
 
     if (pathConfig) {
         const { nodePath } = pathConfig;

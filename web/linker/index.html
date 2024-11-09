@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/core/media/ui/flow_logo.png">
+    <title>Flow Linker</title>
+    <style>
+        :root {
+            --background-color: #121213;
+            --border-color: #320848;
+            --text-color: #cba3e5;
+            --hover-background-color: #8621b7;
+            --hover-box-shadow: 0 0 8px rgba(134, 33, 183, 0.6);
+            --focus-border-color: #570d7b;
+            --focus-box-shadow: 0 0 8px rgba(134, 33, 183, 0.6);
+            --focus-outline-color: #8621b7;
+            --scrollbar-thumb-color: #570d7b;
+            --scrollbar-track-color: #1e1e1f;
+            --panel-background: rgba(255, 255, 255, 0.05);
+            --input-background: #1e1e1f;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: #181b1d;
+            font-family: Arial, sans-serif;
+        }
+        .frame-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            /* transition: all 0.3s ease; */
+        }
+        #flowFrame, #linkerFrame {
+            border: none;
+            height: 100%;
+            /* transition: width 0.3s ease; */
+        }
+        #flowFrame {
+            width: 50%;
+            transition: width 0.3s ease;
+        }
+        #linkerFrame {
+            width: 50%; 
+            overflow: hidden;
+            display: block; 
+            box-shadow: -2px 0 5px rgba(0,0,0,0.5);
+            transition: width 0.3s ease, display 0.3s ease;
+        }
+        #divider {
+            width: 6px;
+            background-color: var(--background-color);
+            cursor: col-resize;
+            flex-shrink: 0;
+            border-left:1px dashed var(--scrollbar-thumb-color);
+            transition: background-color 0.3s ease;
+        }
+        #refreshMainContent {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #8621b7;
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 1001;
+            transition: background-color 0.3s ease;
+        }
+        #refreshMainContent:hover {
+            background-color: #a732c5;
+        }
+        
+        #toggleLinker {
+            position: fixed;
+            bottom: 6px;
+            left: 10px;
+            padding: 10px 20px;
+            background-color: var(--border-color);
+            color: var(--text-color);
+            border: none;
+            cursor: pointer;
+            z-index: 1001;
+            transition: background-color 0.3s ease;
+        }
+        #toggleLinker:hover {
+            background-color: var(--hover-background-color);
+        }
+    </style>
+</head>
+<body>
+    <button id="toggleLinker">Hide Linker</button>
+    <div class="frame-container" id="frameContainer">
+        <iframe id="flowFrame" src="/flow/linker/flow.html"></iframe>
+        <div id="divider"></div>
+        <iframe id="linkerFrame" src="/flow/linker/linker.html"></iframe>
+    </div>
+    <script>
+        const divider = document.getElementById('divider');
+        const flowFrame = document.getElementById('flowFrame');
+        const linkerFrame = document.getElementById('linkerFrame');
+        const toggleButton = document.getElementById('toggleLinker');
+        const frameContainer = document.getElementById('frameContainer');
+        let isDragging = false;
+        let startX, startFlowWidth, isLinkerVisible = true; 
+
+        toggleButton.addEventListener('click', () => {
+            if (isLinkerVisible) {
+                linkerFrame.style.width = '0';
+                setTimeout(() => {
+                    linkerFrame.style.display = 'none';
+                }, 300); 
+                flowFrame.style.width = '100%';
+                toggleButton.textContent = 'Show Linker';
+            } else {
+                
+                linkerFrame.style.display = 'block';
+                
+                requestAnimationFrame(() => {
+                    linkerFrame.style.width = '50%';
+                    flowFrame.style.width = '50%';
+                });
+                toggleButton.textContent = 'Hide Linker';
+            }
+            isLinkerVisible = !isLinkerVisible;
+        });
+
+        
+        divider.addEventListener('mousedown', initDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', stopDrag);
+
+        function initDrag(e) {
+            isDragging = true;
+            startX = e.clientX;
+            startFlowWidth = flowFrame.offsetWidth;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            requestAnimationFrame(() => updateSizes(e.clientX - startX));
+        }
+
+        function stopDrag() {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.removeProperty('cursor');
+                document.body.style.removeProperty('user-select');
+            }
+        }
+
+        function updateSizes(offset) {
+            const containerWidth = frameContainer.clientWidth;
+            const minWidth = containerWidth * 0.2;
+            const maxWidth = containerWidth - minWidth - divider.offsetWidth;
+
+            let newFlowWidth = Math.max(minWidth, Math.min(startFlowWidth + offset, containerWidth - minWidth - divider.offsetWidth));
+            let newLinkerWidth = containerWidth - newFlowWidth - divider.offsetWidth;
+
+            flowFrame.style.width = `${newFlowWidth}px`;
+            linkerFrame.style.width = isLinkerVisible ? `${newLinkerWidth}px` : `0`;
+        }
+
+        function toggleIframePointerEvents(enable) {
+            const pointerEvents = enable ? 'auto' : 'none';
+            flowFrame.style.pointerEvents = pointerEvents;
+            linkerFrame.style.pointerEvents = pointerEvents;
+        }
+
+        divider.addEventListener('mousedown', () => toggleIframePointerEvents(false));
+        document.addEventListener('mouseup', () => toggleIframePointerEvents(true));
+
+        window.addEventListener('message', function(event) {
+            if (event.source === linkerFrame.contentWindow) {
+                if (event.data.type === 'loadFlow') {
+                    const flowUrl = event.data.flowUrl;
+                    flowFrame.src = `/flow/linker/flow.html?flow=${encodeURIComponent(flowUrl)}`;
+                } else if (event.data === 'refreshflowFrame') {
+                    flowFrame.contentWindow.location.reload();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,11 +1,13 @@
-export const  componentTypes = {
-    'workflowInput': [
+export const componentTypes = {
+    'prompt': [
         { name: 'id', label: 'ID', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
         { name: 'default', label: 'Default Value', type: 'text' },
     ],
-    'seeder': [
+    'dropdown': [
         { name: 'id', label: 'ID', type: 'text' },
+        { name: 'url', label: 'URL', type: 'text' },
+        { name: 'key', label: 'Key', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
     ],
     'stepper': [
@@ -18,17 +20,21 @@ export const  componentTypes = {
         { name: 'precision', type: 'number', label: 'Precision', value: 1 },
         { name: 'scaleFactor', type: 'number', label: 'Scale Factor', value: 10 },
     ],
-    'dropdown': [
-        { name: 'id', label: 'ID', type: 'text' },
-        { name: 'url', label: 'URL', type: 'text' },
-        { name: 'key', label: 'Key', type: 'text' },
-        { name: 'label', label: 'Label', type: 'text' },
-    ],
-    'multiStepper': [
+    'input': [
         { name: 'id', label: 'ID', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
+        { name: 'defValue', label: 'Default Value', type: 'text' },
     ],
-    'dropdownStepper': [
+    'toggle': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+        { name: 'defaultValue', label: 'Default Value' , value: true},
+    ],
+    'seeder': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],
+    'multiComponent': [
         { name: 'id', label: 'ID', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
     ],

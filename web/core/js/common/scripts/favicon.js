@@ -1,4 +1,4 @@
-const FAVICON_BASE_PATH = '../core/media/ui/';
+const FAVICON_BASE_PATH = '/core/media/ui/';
 
 const FAVICONS = {
     DEFAULT: 'flow_logo.png',  

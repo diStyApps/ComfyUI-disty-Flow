@@ -10,6 +10,10 @@ async function checkAndShowMissingPackagesDialog(missingCustomPackages, missingN
 }
 
 function enrichMissingCustomPackages(missingCustomPackages, flowConfig) {
+    if (!flowConfig.configCustomNodes) {
+        return missingCustomPackages;
+    }
+
     const customNodesByTitle = {};
     for (const nodeConfig of flowConfig.configCustomNodes) {
         customNodesByTitle[nodeConfig.title] = nodeConfig;
