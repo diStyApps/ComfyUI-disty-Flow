@@ -715,7 +715,6 @@ async def get_theme_css_handler(request: web.Request) -> web.Response:
         raise web.HTTPInternalServerError(text="Internal Server Error")
 
 def download_or_update_flows() -> None:
-    # List of flow directories to remove if they exist
     flows_to_remove = [
         "afl_CogVideoX-Fun-i2v-es",
         "afl_CogVideoX-Fun-i2v",
@@ -748,21 +747,17 @@ def download_or_update_flows() -> None:
     ]
 
     try:
-        # Remove specified flows if they exist in FLOWS_PATH
         for flow in flows_to_remove:
             flow_path = FLOWS_PATH / flow
             if flow_path.exists() and flow_path.is_dir():
-                logger.info(f"{FLOWMSG}: Removing existing flow directory '{flow}'")
+                # logger.info(f"{FLOWMSG}: Removing existing flow directory '{flow}'")
                 shutil.rmtree(flow_path)
-                logger.debug(f"{FLOWMSG}: Successfully removed '{flow}'")
-            else:
-                logger.debug(f"{FLOWMSG}: Flow directory '{flow}' does not exist and cannot be removed")
+                # logger.debug(f"{FLOWMSG}: Successfully removed '{flow}'")
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             temp_repo_path = Path(tmpdirname) / "Flows"
-            logger.info(f"{FLOWMSG}: Downloading Flows from {FLOWS_DOWNLOAD_PATH}")
+            logger.info(f"{FLOWMSG}: Downloading Flows")
 
-            # Clone the flows repository
             result = subprocess.run(
                 ['git', 'clone', FLOWS_DOWNLOAD_PATH, str(temp_repo_path)],
                 capture_output=True,
@@ -774,32 +769,29 @@ def download_or_update_flows() -> None:
             else:
                 logger.debug(f"{FLOWMSG}: Successfully cloned flows repository")
 
-            # Ensure FLOWS_PATH exists
             if not FLOWS_PATH.exists():
                 FLOWS_PATH.mkdir(parents=True)
-                logger.debug(f"{FLOWMSG}: Created flows directory at '{FLOWS_PATH}'")
+                # logger.debug(f"{FLOWMSG}: Created flows directory at '{FLOWS_PATH}'")
 
-            # Iterate through items in the cloned repository and copy them to FLOWS_PATH
             for item in temp_repo_path.iterdir():
                 if item.name in ['.git', '.github']:
-                    logger.debug(f"{FLOWMSG}: Skipping directory '{item.name}'")
+                    # logger.debug(f"{FLOWMSG}: Skipping directory '{item.name}'")
                     continue
                 dest_item = FLOWS_PATH / item.name
                 if item.is_dir():
                     if dest_item.exists():
-                        logger.info(f"{FLOWMSG}: Updating existing directory '{item.name}'")
+                        # logger.info(f"{FLOWMSG}: Updating existing directory '{item.name}'")
                         _copy_directory(item, dest_item)
                     else:
                         shutil.copytree(item, dest_item)
-                        logger.info(f"{FLOWMSG}: Copied new directory '{item.name}'")
+                        # logger.info(f"{FLOWMSG}: Copied new directory '{item.name}'")
                 else:
                     shutil.copy2(item, dest_item)
-                    logger.info(f"{FLOWMSG}: Copied file '{item.name}'")
+                    # logger.info(f"{FLOWMSG}: Copied file '{item.name}'")
 
             logger.info(f"{FLOWMSG}: Flows have been updated successfully.")
     except Exception as e:
         logger.error(f"{FLOWMSG}: An error occurred while downloading or updating flows: {e}")
-
 def _copy_directory(src: Path, dest: Path) -> None:
     for item in src.iterdir():
         if item.name in ['.git', '.github']:
