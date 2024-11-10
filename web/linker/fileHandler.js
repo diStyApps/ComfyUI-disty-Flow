@@ -244,7 +244,7 @@ function resetComponentCounters(state, flowConfig) {
 }
 
 function populateAssignedComponents(state, flowConfig) {
-    state.assignedComponents = {};
+    state.assignedComponents = [];
     state.multiComponents = []; 
 
     
@@ -260,12 +260,9 @@ function populateAssignedComponents(state, flowConfig) {
                 const nodeId = getNodeIdFromNodePath(nodePath);
                 if (!nodeId) return;
 
-                if (!state.assignedComponents[nodeId]) state.assignedComponents[nodeId] = [];
-
-                state.assignedComponents[nodeId].push({
-                    type: singularType,
-                    params: { id, label: label || '', nodePath, ...otherParams },
-                    inMultiComponent: false,
+                state.assignedComponents.push({
+                    nodeId,
+                    component: { type: singularType, params: { id, label: label || '', nodePath, ...otherParams }, inMultiComponent: false },
                 });
             });
         }
@@ -323,32 +320,20 @@ function addComponentToState(state, componentData, singularType, inMultiComponen
     const nodeId = getNodeIdFromNodePath(nodePath);
     if (!nodeId) return;
 
-    if (!state.assignedComponents[nodeId]) state.assignedComponents[nodeId] = [];
-
-    
-    let assignedComponent = state.assignedComponents[nodeId].find(c => c.params.id === id);
-    if (!assignedComponent) {
-        
-        assignedComponent = {
-            type: singularType,
-            params: { id, label: label || '', nodePath, ...otherParams },
-            inMultiComponent,
-        };
-        state.assignedComponents[nodeId].push(assignedComponent);
-    } else {
-        
-        assignedComponent.inMultiComponent = inMultiComponent;
-    }
+    state.assignedComponents.push({
+        nodeId,
+        component: { type: singularType, params: { id, label: label || '', nodePath, ...otherParams }, inMultiComponent },
+    });
 }
 
 function findComponentInState(state, componentId, nodePath) {
     const nodeId = getNodeIdFromNodePath(nodePath);
-    if (!nodeId || !state.assignedComponents[nodeId]) return null;
+    if (!nodeId) return null;
 
-    const index = state.assignedComponents[nodeId].findIndex(c => c.params.id === componentId);
+    const index = state.assignedComponents.findIndex(ac => ac.nodeId === nodeId && ac.component.params.id === componentId);
     if (index === -1) return null;
 
-    const component = state.assignedComponents[nodeId][index];
+    const component = state.assignedComponents[index].component;
     return { nodeId, component, index };
 }
 

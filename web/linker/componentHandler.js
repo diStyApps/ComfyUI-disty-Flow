@@ -1,5 +1,3 @@
-
-
 import { componentTypes } from '/core/js/common/scripts/componentTypes.js';
 import { componentTemplates } from '/core/js/common/scripts/templates.js'; 
 import { updateWorkflowConfig } from './configHandler.js';
@@ -84,12 +82,12 @@ function generateTemplateOptions(nodeInfo) {
         .filter(templateName => {
             const template = componentTemplates[templateName];
 
-            
+            // Filter out templates not matching the nodeClassType
             if (template.nodeClass && template.nodeClass !== nodeClassType) {
                 return false;
             }
 
-            
+            // Ensure all required inputs are present
             let requiredInputs = [];
             if (template.type === 'component') {
                 const compTemplate = template.component;
@@ -102,7 +100,6 @@ function generateTemplateOptions(nodeInfo) {
                 });
             }
 
-            
             const missingInputs = requiredInputs.filter(input => !nodeInputs.includes(input));
             if (missingInputs.length > 0) {
                 return false;
@@ -265,9 +262,8 @@ function applyTemplate(nodeId, nodeInfo, state, templateName) {
                 inMultiComponent: true, 
             };
 
-            if (!state.assignedComponents[nodeId]) state.assignedComponents[nodeId] = [];
-            state.assignedComponents[nodeId].push(componentData);
-            const componentIndex = state.assignedComponents[nodeId].length - 1;
+            state.assignedComponents.push({ nodeId, component: componentData });
+            const componentIndex = state.assignedComponents.length - 1;
 
             multiComponent.components.push({
                 nodeId,
@@ -341,7 +337,7 @@ function saveComponent(section, nodeId, componentType, nodePath, state, existing
         const multiComponent = state.multiComponents[multiIndex];
         if (multiComponent) {
             
-            const multiComp = multiComponent.components.find(comp => comp.nodeId === nodeId && comp.index === componentIndex);
+            const multiComp = multiComponent.components.find(comp => comp.index === componentIndex);
             if (multiComp) {
                 multiComp.component = { type: componentType, params };
                 updateComponentsList(state);
@@ -394,13 +390,11 @@ function generateComponentId(componentType, state, params) {
 
 function getAllComponentIds(state) {
     const ids = [];
-    for (const [nodeId, components] of Object.entries(state.assignedComponents || {})) {
-        components.forEach(component => {
-            if (component.params && component.params.id) {
-                ids.push(component.params.id);
-            }
-        });
-    }
+    state.assignedComponents.forEach(({ component }) => {
+        if (component.params && component.params.id) {
+            ids.push(component.params.id);
+        }
+    });
     state.multiComponents.forEach(multiComponent => {
         if (multiComponent.id) ids.push(multiComponent.id);
     });
@@ -417,34 +411,16 @@ function enrichDropdownComponentParams(params, state, nodeId) {
 }
 
 function updateAssignedComponents(state, nodeId, componentType, params, existingComponent = null, componentIndex = null) {
-    if (!state.assignedComponents[nodeId]) state.assignedComponents[nodeId] = [];
+    const newComponent = { type: componentType, params };
 
-    const componentData = { type: componentType, params };
     if (existingComponent && componentIndex !== null) {
-        state.assignedComponents[nodeId][componentIndex] = componentData;
+        const assignedCompIndex = state.assignedComponents.findIndex(ac => ac.nodeId === nodeId && ac.component.params.id === existingComponent.params.id);
+        if (assignedCompIndex !== -1) {
+            state.assignedComponents[assignedCompIndex].component = newComponent;
+        }
     } else {
-        state.assignedComponents[nodeId].push(componentData);
+        state.assignedComponents.push({ nodeId, component: newComponent });
     }
-}
-
-function clearComponentForm() {
-    const section = document.getElementById('nodeToComponentSection');
-    if (section) section.innerHTML = '';
-}
-
-function getSortOrderForNodeType(nodeType) {
-    
-    const orderPriority = {
-        'CheckpointLoaderSimple': 0,
-        'UNETLoader': 1,
-        'VAELoader': 2,
-        'CLIPLoader': 3,
-        'ModelSamplingFlux': 4,
-        
-    };
-    
-    
-    return orderPriority[nodeType] !== undefined ? orderPriority[nodeType] : 999;
 }
 
 function updateComponentsList(state) {
@@ -454,29 +430,20 @@ function updateComponentsList(state) {
     componentsListElement.innerHTML = '<h2>Components List</h2>';
 
     
-    const sortedNodes = Object.entries(state.assignedComponents || {})
-        .sort((a, b) => {
-            const nodeTypeA = state.nodeToCustomNodeMap[a[0]]?.classType;
-            const nodeTypeB = state.nodeToCustomNodeMap[b[0]]?.classType;
-            return getSortOrderForNodeType(nodeTypeA) - getSortOrderForNodeType(nodeTypeB);
-        });
-
-    
     state.multiComponents.forEach((multiComponent, index) => {
         const multiComponentItem = createMultiComponentListItem(multiComponent, index, state);
         componentsListElement.appendChild(multiComponentItem);
     });
 
     
-    sortedNodes.forEach(([nodeId, components]) => {
+    state.assignedComponents.forEach((assignedComp, index) => {
+        const { nodeId, component } = assignedComp;
         const nodeInfo = state.nodeToCustomNodeMap[nodeId];
         const nodeType = nodeInfo ? nodeInfo.classType : 'Unknown';
 
-        components.forEach((component, index) => {
-            if (component.inMultiComponent) return; 
-            const componentItem = createComponentListItem(nodeId, component, index, state);
-            componentsListElement.appendChild(componentItem);
-        });
+        if (component.inMultiComponent) return; 
+        const componentItem = createComponentListItem(nodeId, component, index, state);
+        componentsListElement.appendChild(componentItem);
     });
 
     
@@ -498,10 +465,12 @@ function createComponentListItem(nodeId, component, index, state) {
         <p>Node ID: ${nodeId} | Type: ${component.type}</p>
         <p>Node Type: ${nodeType}</p>
         <div class="button-group">
-            <button data-node-id="${nodeId}" data-component-index="${index}" class="move-up-button" title="Move Up">&#8679;</button>
-            <button data-node-id="${nodeId}" data-component-index="${index}" class="move-down-button" title="Move Down">&#8681;</button>
-            <button data-node-id="${nodeId}" data-component-index="${index}" class="edit-component-button">Edit</button>
-            <button data-node-id="${nodeId}" data-component-index="${index}" class="delete-component-button">Delete</button>
+        <button data-index="${index}" class="move-top-button" title="Move to Top">↑↑</button>
+        <button data-index="${index}" class="move-up-button" title="Move Up">↑</button>
+        <button data-index="${index}" class="move-down-button" title="Move Down">↓</button>
+        <button data-index="${index}" class="move-bottom-button" title="Move to Bottom">↓↓</button>
+            <button data-index="${index}" class="edit-component-button">Edit</button>
+            <button data-index="${index}" class="delete-component-button">Delete</button>
         </div>
     `;
 
@@ -519,9 +488,11 @@ function createMultiComponentListItem(multiComponent, index, state) {
             <button data-multi-index="${index}" class="edit-multicomponent-button">Edit</button>
             <button data-multi-index="${index}" class="delete-multicomponent-button">Delete</button>
             </div>
-            <button data-multi-index="${index}" class="move-up-multicomponent-button" title="Move Up">&#8679;</button>
-            <button data-multi-index="${index}" class="move-down-multicomponent-button" title="Move Down">&#8681;</button>
-    `;
+            `;
+            // <button data-multi-index="${index}" class="move-top-multicomponent-button" title="Move MultiComponent to Top">↑↑</button>
+            // <button data-multi-index="${index}" class="move-up-multicomponent-button" title="Move MultiComponent Up">↑</button>
+            // <button data-multi-index="${index}" class="move-down-multicomponent-button" title="Move MultiComponent Down">↓</button>
+            // <button data-multi-index="${index}" class="move-bottom-multicomponent-button" title="Move MultiComponent to Bottom">↓↓</button>
 
     return item;
 }
@@ -532,41 +503,56 @@ function attachComponentsListEventListeners(componentsListElement, state) {
     const deleteButtons = componentsListElement.querySelectorAll('.delete-component-button');
     const moveUpButtons = componentsListElement.querySelectorAll('.move-up-button');
     const moveDownButtons = componentsListElement.querySelectorAll('.move-down-button');
+    const moveTopButtons = componentsListElement.querySelectorAll('.move-top-button');
+    const moveBottomButtons = componentsListElement.querySelectorAll('.move-bottom-button');
 
     editButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
-            const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
-            const component = state.assignedComponents[nodeId][componentIndex];
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            const assignedComp = state.assignedComponents[index];
+            if (!assignedComp) return;
+            const { nodeId, component } = assignedComp;
             const nodeInfo = state.nodeToCustomNodeMap[nodeId];
             // clearComponentForm();
 
             
-            editDisplayComponentForm(nodeId, nodeInfo, state, component, componentIndex, 'componentsList');
+            editDisplayComponentForm(nodeId, nodeInfo, state, component, index, 'componentsList');
         });
     });
 
     deleteButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
-            const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
-            deleteComponent(nodeId, componentIndex, state);
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            deleteComponent(index, state);
         });
     });
 
     moveUpButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
-            const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
-            moveComponentUp(nodeId, componentIndex, state);
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            moveComponentUp(index, state);
         });
     });
 
     moveDownButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
-            const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
-            moveComponentDown(nodeId, componentIndex, state);
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            moveComponentDown(index, state);
+        });
+    });
+
+    // Attach event listeners for new Move to Top and Move to Bottom buttons
+    moveTopButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            moveComponentToTop(index, state);
+        });
+    });
+
+    moveBottomButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const index = parseInt(button.getAttribute('data-index'), 10);
+            moveComponentToBottom(index, state);
         });
     });
 
@@ -575,12 +561,14 @@ function attachComponentsListEventListeners(componentsListElement, state) {
     const deleteMultiButtons = componentsListElement.querySelectorAll('.delete-multicomponent-button');
     const moveUpMultiButtons = componentsListElement.querySelectorAll('.move-up-multicomponent-button');
     const moveDownMultiButtons = componentsListElement.querySelectorAll('.move-down-multicomponent-button');
+    const moveTopMultiButtons = componentsListElement.querySelectorAll('.move-top-multicomponent-button');
+    const moveBottomMultiButtons = componentsListElement.querySelectorAll('.move-bottom-multicomponent-button');
 
     editMultiButtons.forEach(button => {
         button.addEventListener('click', () => {
             const multiIndex = parseInt(button.getAttribute('data-multi-index'), 10);
             const multiComponent = state.multiComponents[multiIndex];
-            editDisplayMultiComponentForm(multiIndex, multiComponent, state);
+            displayMultiComponentForm(state, multiComponent, multiIndex);
         });
     });
 
@@ -591,47 +579,71 @@ function attachComponentsListEventListeners(componentsListElement, state) {
         });
     });
 
-    moveUpMultiButtons.forEach(button => {
+    moveTopMultiButtons.forEach(button => {
         button.addEventListener('click', () => {
             const multiIndex = parseInt(button.getAttribute('data-multi-index'), 10);
-            moveMultiComponentUp(multiIndex, state);
+            moveMultiComponentToTop(multiIndex, state);
         });
     });
 
-    moveDownMultiButtons.forEach(button => {
+    moveBottomMultiButtons.forEach(button => {
         button.addEventListener('click', () => {
             const multiIndex = parseInt(button.getAttribute('data-multi-index'), 10);
-            moveMultiComponentDown(multiIndex, state);
+            moveMultiComponentToBottom(multiIndex, state);
         });
     });
 }
 
-function moveComponentUp(nodeId, componentIndex, state) {
-    if (!state.assignedComponents[nodeId] || componentIndex <= 0) return;
+function moveComponentUp(index, state) {
+    if (index <= 0 || index >= state.assignedComponents.length) return;
 
     
-    [state.assignedComponents[nodeId][componentIndex - 1], state.assignedComponents[nodeId][componentIndex]] =
-        [state.assignedComponents[nodeId][componentIndex], state.assignedComponents[nodeId][componentIndex - 1]];
+    [state.assignedComponents[index - 1], state.assignedComponents[index]] =
+        [state.assignedComponents[index], state.assignedComponents[index - 1]];
 
     updateComponentsList(state);
     updateWorkflowConfig(state);
 }
 
-function moveComponentDown(nodeId, componentIndex, state) {
-    if (!state.assignedComponents[nodeId] || componentIndex >= state.assignedComponents[nodeId].length - 1) return;
+function moveComponentDown(index, state) {
+    if (index < 0 || index >= state.assignedComponents.length - 1) return;
 
     
-    [state.assignedComponents[nodeId][componentIndex + 1], state.assignedComponents[nodeId][componentIndex]] =
-        [state.assignedComponents[nodeId][componentIndex], state.assignedComponents[nodeId][componentIndex + 1]];
+    [state.assignedComponents[index + 1], state.assignedComponents[index]] =
+        [state.assignedComponents[index], state.assignedComponents[index + 1]];
 
     updateComponentsList(state);
     updateWorkflowConfig(state);
 }
 
-function deleteComponent(nodeId, componentIndex, state) {
-    if (state.assignedComponents[nodeId]) {
-        state.assignedComponents[nodeId].splice(componentIndex, 1);
-        if (state.assignedComponents[nodeId].length === 0) delete state.assignedComponents[nodeId];
+function moveComponentToTop(index, state) {
+    if (index <= 0 || index >= state.assignedComponents.length) return;
+
+    const [component] = state.assignedComponents.splice(index, 1);
+    state.assignedComponents.unshift(component);
+
+    updateComponentsList(state);
+    updateWorkflowConfig(state);
+}
+
+function moveComponentToBottom(index, state) {
+    if (index < 0 || index >= state.assignedComponents.length - 1) return;
+
+    const [component] = state.assignedComponents.splice(index, 1);
+    state.assignedComponents.push(component);
+
+    updateComponentsList(state);
+    updateWorkflowConfig(state);
+}
+
+function deleteComponent(index, state) {
+    if (state.assignedComponents[index]) {
+        if (state.assignedComponents[index].component.inMultiComponent) {
+            state.multiComponents.forEach(multiComponent => {
+                multiComponent.components = multiComponent.components.filter(comp => comp.index !== index);
+            });
+        }
+        state.assignedComponents.splice(index, 1);
     }
     updateComponentsList(state);
     updateWorkflowConfig(state);
@@ -664,7 +676,6 @@ function displayMultiComponentParams(container, multiComponent) {
     const paramGroup = paramsContainer.querySelector('.multi-parameter-group');
 
     
-    
     paramGroup.innerHTML = `
         <label for="multiLabel">Label:</label>
         <input type="text" id="multiLabel" name="label" value="${multiComponent.label || ''}">
@@ -694,23 +705,66 @@ function attachEditMultiComponentFormEvents(container, multiIndex, multiComponen
     });
 }
 
-function deleteMultiComponent(multiIndex, state) {
-    if (state.multiComponents && state.multiComponents.length > multiIndex) {
-        const multiComponent = state.multiComponents[multiIndex];
-        multiComponent.components.forEach(({ nodeId, index }) => {
-            if (state.assignedComponents[nodeId] && state.assignedComponents[nodeId][index]) {
-                state.assignedComponents[nodeId][index].inMultiComponent = false;
-            }
-        });
-        state.multiComponents.splice(multiIndex, 1);
-    }
+function moveMultiComponentUp(index, state) {
+    if (index <= 0 || index >= state.multiComponents.length) return;
+
+    
+    [state.multiComponents[index - 1], state.multiComponents[index]] =
+        [state.multiComponents[index], state.multiComponents[index - 1]];
+
     updateComponentsList(state);
     updateWorkflowConfig(state);
+}
+
+function moveMultiComponentDown(index, state) {
+    if (index < 0 || index >= state.multiComponents.length - 1) return;
+
+    
+    [state.multiComponents[index + 1], state.multiComponents[index]] =
+        [state.multiComponents[index], state.multiComponents[index + 1]];
+
+    updateComponentsList(state);
+    updateWorkflowConfig(state);
+}
+
+function moveMultiComponentToTop(index, state) {
+    if (index <= 0 || index >= state.multiComponents.length) return;
+
+    const [multiComponent] = state.multiComponents.splice(index, 1);
+    state.multiComponents.unshift(multiComponent);
+
+    updateComponentsList(state);
+    updateWorkflowConfig(state);
+}
+
+function moveMultiComponentToBottom(index, state) {
+    if (index < 0 || index >= state.multiComponents.length - 1) return;
+
+    const [multiComponent] = state.multiComponents.splice(index, 1);
+    state.multiComponents.push(multiComponent);
+
+    updateComponentsList(state);
+    updateWorkflowConfig(state);
+}
+
+function deleteMultiComponent(multiIndex, state) {
+    const multiComponent = state.multiComponents[multiIndex];
+
+    multiComponent.components.forEach(({ index }) => {
+        if (state.assignedComponents[index]) {
+            state.assignedComponents[index].component.inMultiComponent = false;
+        }
+    });
+
+    state.multiComponents.splice(multiIndex, 1);
+
+    updateComponentsList(state);
+    updateWorkflowConfig(state);
+    attachMultiComponentListEventListeners(state);
 }
 
 function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-export { nodeSelectDisplayComponentForm, editDisplayComponentForm, updateComponentsList, getSortOrderForNodeType };
-
+export { nodeSelectDisplayComponentForm, editDisplayComponentForm, updateComponentsList };

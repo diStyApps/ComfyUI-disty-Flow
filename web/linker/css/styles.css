@@ -1,15 +1,48 @@
 /* [No changes made to styles.css; including it for completeness] */
+
+
+:root {
+    --color-background: #000000;
+    --color-primary-text: #888888;
+    --color-background-pattern: #424242;
+    --color-border: #3b3b3b;
+    --color-header-background: #131312;
+    --color-header-text: #888888;
+    --color-background-secondary: #0d0d0d;
+    --color-button-primary: #000000;
+    --color-button-primary-text: #888888;
+    --color-button-primary-hover: #707070;
+    --color-button-primary-text-hover: #000000;
+    --color-button-primary-active: #d9d8d8;
+    --color-button-primary-text-active: #707070;
+    --color-button-secondary: #0d0d0d;
+    --color-button-secondary-text: #888888;
+    --color-button-secondary-hover: #707070;
+    --color-button-secondary-text-hover: #000000;
+    --color-button-secondary-active: #707070;
+    --color-button-secondary-text-active: #000000;
+    --color-progress-background: #000000;
+    --color-progress-value: #908989;
+    --color-scrollbar-track: #1e1e1f;
+    --color-scrollbar-thumb: #7a7a7a;
+    --color-input-range-thumb: #0d0d0d;
+    --color-input-range-background: #707070;
+    --color-spinner: #908989;
+    --color-spinner-highlight: #908989;
+}
+
+
 :root {
     --background-color: #121213;
-    --border-color: #320848;
-    --text-color: #cba3e5;
-    --hover-background-color: #8621b7;
+    --border-color: none;
+    --text-color: var(--color-primary-text);
+    --hover-background-color: var(--color-background-pattern);
     --hover-box-shadow: 0 0 8px rgba(134, 33, 183, 0.6);
     --focus-border-color: #570d7b;
     --focus-box-shadow: 0 0 8px rgba(134, 33, 183, 0.6);
-    --focus-outline-color: #8621b7;
-    --scrollbar-thumb-color: #570d7b;
-    --scrollbar-track-color: #1e1e1f;
+    --focus-outline-color: none;
+    --scrollbar-thumb-color: var(--color-scrollbar-thumb);
+    --scrollbar-track-color: var(--color-scrollbar-track);
     --panel-background: rgba(255, 255, 255, 0.05);
     --input-background: #1e1e1f;
 }
@@ -70,7 +103,7 @@ select, input[type="text"], input[type="file"], textarea, button, .parameter-inp
     padding: 8px;
     margin-bottom: 12px;
     background-color: var(--input-background);
-    border: 1px solid var(--border-color);
+    border: dashed 1px var(--border-color);
     color: var(--text-color);
     font-size: 14px;
     box-sizing: border-box;
@@ -87,22 +120,24 @@ select:focus, input[type="text"]:focus, input[type="file"]:focus, textarea:focus
 }
 
 button {
-    background-color: var(--hover-background-color);
-    color: white;
+    background-color: var(--color-button-primary-text);
+    color: var(--color-button-primary);
     border: none;
     cursor: pointer;
-    transition: background-color 0.3s ease;
     font-size: small;
-
+    transition: background-color 0.3s ease;
 }
 
 button:hover {
-    background-color: var(--focus-border-color);
+    background-color: var(--color-button-primary-hover);
+    color: var(--color-button-primary-text-hover);
+    transition: background-color 0.3s ease;
 }
 
 input[type="file"] {
     padding: 6px;
     cursor: pointer;
+    
 }
 
 input[type="file"]::-webkit-file-upload-button {
@@ -113,8 +148,10 @@ input[type="file"]::-webkit-file-upload-button {
 input[type="file"]::before {
     content: 'Choose File';
     display: inline-block;
-    background-color: var(--hover-background-color);
-    color: white;
+    /* background-color: var(--input-background); */
+    background-color: rgba(255, 255, 255, 0.05);
+
+    color: var(--text-color);
     border: none;
     padding: 5px 8px;
     outline: none;
@@ -122,11 +159,54 @@ input[type="file"]::before {
     cursor: pointer;
     font-weight: 700;
     font-size: 10pt;
+
 }
 
 input[type="file"]:hover::before {
-    background-color: var(--focus-border-color);
+    background-color: var(--hover-background-color);
 }
+
+
+#urlLoadButton {
+    display: inline-block;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-color);
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+#urlLoadButton:hover {
+    background-color: var(--hover-background-color);
+}
+
+#urlInput {
+    border-bottom: solid 1px var(--hover-background-color);
+}
+#urlInput:hover {
+    border-bottom: solid 1px var(--color-button-primary-hover);
+    
+}
+
+.button-group {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr); /* Creates 4 equal columns */
+    gap: 4px; /* Optional: adds space between buttons */
+}
+
+/* Target last two buttons to span 2 columns each */
+.button-group > *:nth-last-child(2),
+.button-group > *:last-child {
+    grid-column: span 2;
+}
+
+
+/* .button-group {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 10px;
+} */
 
 .node-info-box, .component-item {
     background-color: rgba(255, 255, 255, 0.05);
@@ -134,12 +214,7 @@ input[type="file"]:hover::before {
     margin-bottom: 15px;
     /* display: flex; */
 }
-.button-group {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 10px;
-}
+
 .parameter-group {
     display: grid;
     gap: 10px;
@@ -183,13 +258,19 @@ input[type="file"]:hover::before {
 #workflowConfig {
     white-space: pre-wrap;
     word-wrap: break-word;
-    background-color: rgba(255, 255, 255, 0.05);
+    /* background-color: rgba(255, 255, 255, 0.05); */
     padding: 10px;
     overflow-x: auto;
     font-size: 12px;
     /* height: 100px; */
 }
-
+#fileInput{
+    /* background-color: rgba(255, 255, 255, 0.05); */
+    
+    }
+    #fileInput:hover {
+        background-color: var(--hover-background-color);
+    }
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -201,25 +282,36 @@ input[type="file"]:hover::before {
 
 ::-webkit-scrollbar-thumb {
     background-color: var(--scrollbar-thumb-color);
-    border-radius: 4px;
+    /* border-radius: 4px; */
     border: 2px solid var(--scrollbar-track-color);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--hover-background-color);
+    background-color: var(--color-progress-value);
 }
 #saveOptions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(70px, 10fr));
     gap: 4px;
-    /* background-color: blue; */
+
 }
 
 #saveOptions > *:first-child {
     grid-column: 1 / -1;
 }
 
+#saveOptions  button {
+    background-color: var(--input-background);
+    color: var(--text-color);
+    border: none;
+    cursor: pointer;
+    font-size: small;
+    transition: background-color 0.3s ease;
+}
 
+#saveOptions button:hover {
+    background-color: var(--hover-background-color);
+}
 
 /* @media (max-width: 50px) {
     .container {
@@ -268,7 +360,7 @@ input[type="file"]:hover::before {
 .thumbnail-preview {
     width: 150px;
     height: 150px;
-    border: 1px dashed var(--border-color);
+    border: 1px dashed var(--color-border) !important;
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -309,11 +401,13 @@ input:-webkit-autofill:focus {
        
 .loading-flows-tabs {
     /* padding: 20px; */
-    max-width: 600px;
-    margin: 0 auto;
+    /* max-width: 600px; */
+    /* margin: 0 auto; */
     background-color: var(--background-color);
     color: var(--text-color);
     margin-bottom: 20px;
+    /* width: 100%; */
+    
 }
 
 .loading-flows-tabs .tabs {
@@ -355,7 +449,10 @@ input:-webkit-autofill:focus {
     /* border-radius: 4px; */
     /* border: 1px solid var(--border-color); */
     /* height: 100px; */
+    /* background-color: rgba(255, 255, 255, 0.05); */
+
 }
+
 
 .loading-flows-tabs #tab1:checked ~ .tab-content .tab-panel:nth-of-type(1),
 .loading-flows-tabs #tab2:checked ~ .tab-content .tab-panel:nth-of-type(2),
@@ -373,6 +470,8 @@ input:-webkit-autofill:focus {
     /* border-color: var(--border-color); */
     /* box-shadow: var(--hover-box-shadow); */
     /* margin-bottom: -2px; */
+    /* background-color: rgba(255, 255, 255, 0.05); */
+
 }
 
 .loading-flows-tabs input[type="text"], 
@@ -384,6 +483,8 @@ input:-webkit-autofill:focus {
     /* border-radius: 4px; */
     background: var(--input-background);
     color: var(--text-color);
+    /* background-color: rgba(255, 255, 255, 0.05); */
+
 }
 
 .loading-flows-tabs input[type="text"]:focus, 
@@ -407,6 +508,8 @@ input:-webkit-autofill:focus {
     /* border-radius: 4px; */
     cursor: pointer;
     transition: all 0.3s ease;
+    /* background-color: rgba(255, 255, 255, 0.05); */
+
 }
 
 .loading-flows-tabs button:hover {
@@ -445,8 +548,8 @@ input:-webkit-autofill:focus {
 }
 .thumbnail-preview {
     position: relative;
-    width: 150px;
-    height: 150px;
+    /* width: 150px; */
+    /* height: 150px; */
     border: 1px dashed var(--drop-area-border);
     overflow: hidden;
     cursor: pointer;
@@ -455,6 +558,8 @@ input:-webkit-autofill:focus {
     align-items: center;
     justify-content: center;
     background-color: var(--input-background);
+    border: dashed 1px var(--border-color);
+
 }
 
 .thumbnail-preview.dragover {

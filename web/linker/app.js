@@ -1,4 +1,3 @@
-
 import { initializeSaveOptions, updateWorkflowConfig } from './configHandler.js';
 import { initializeFileHandlers } from './fileHandler.js';
 import { displayNodes, displayNodeInfo } from './nodeHandler.js';
@@ -6,7 +5,7 @@ import { initializeMultiComponentHandler } from './multiComponentHandler.js';
 
 const state = {
     nodeToCustomNodeMap: {},
-    assignedComponents: {},
+    assignedComponents: [],
     multiComponents: [],
     components: [],
     flowId: '',

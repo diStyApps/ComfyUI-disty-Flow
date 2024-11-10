@@ -1,5 +1,3 @@
-
-
 import { updateWorkflowConfig } from './configHandler.js';
 import { nodeSelectDisplayComponentForm, updateComponentsList } from './componentHandler.js';
 
@@ -48,15 +46,14 @@ function generateMultiComponentFormHTML(state, existingMultiComponent = null) {
 
 function generateExistingComponentsOptions(state) {
     const options = [];
-    for (const [nodeId, components] of Object.entries(state.assignedComponents)) {
-        components.forEach((component, index) => {
-            if (!component.inMultiComponent) {
-                options.push(
-                    `<option value="${nodeId}|${index}">${component.params.label || component.params.id} (Node ID: ${nodeId}, Type: ${component.type})</option>`
-                );
-            }
-        });
-    }
+    state.assignedComponents.forEach((assignedComp, index) => {
+        const { nodeId, component } = assignedComp;
+        if (!component.inMultiComponent) {
+            options.push(
+                `<option value="${index}">${component.params.label || component.params.id} (Node ID: ${nodeId}, Type: ${component.type})</option>`
+            );
+        }
+    });
     return options.join('');
 }
 
@@ -67,7 +64,6 @@ function attachMultiComponentFormEvents(state, existingMultiComponent = null, mu
     const saveMultiComponentButton = document.getElementById('saveMultiComponentButton');
     const multiComponentNameInput = document.getElementById('multiComponentName');
 
-    
     const multiComponent = existingMultiComponent ? { ...existingMultiComponent } : {
         id: `multiComponent${Math.random().toString(36).substring(2, 8)}`,
         label: '',
@@ -75,10 +71,9 @@ function attachMultiComponentFormEvents(state, existingMultiComponent = null, mu
     };
 
     if (existingMultiComponent) {
-        
         multiComponent.components = existingMultiComponent.components.map(comp => ({
             nodeId: comp.nodeId,
-            component: state.assignedComponents[comp.nodeId][comp.index],
+            component: state.assignedComponents[comp.index].component,
             index: comp.index,
         }));
     }
@@ -86,17 +81,20 @@ function attachMultiComponentFormEvents(state, existingMultiComponent = null, mu
     updateMultiComponentComponentsList(multiComponent, state, multiIndex);
     updateExistingComponentsOptions(state);
 
-    
     addComponentButton.addEventListener('click', () => {
         const selectedValue = existingComponentsSelect.value;
         if (selectedValue) {
-            const [nodeId, componentIndex] = selectedValue.split('|');
-            const index = parseInt(componentIndex, 10);
-            const component = state.assignedComponents[nodeId][index];
+            const componentIndex = parseInt(selectedValue, 10);
+            const assignedComp = state.assignedComponents[componentIndex];
+            if (!assignedComp) {
+                alert('Selected component does not exist.');
+                return;
+            }
+            const { nodeId, component } = assignedComp;
 
-            
-            component.inMultiComponent = true;
-            multiComponent.components.push({ nodeId, component, index });
+            state.assignedComponents[componentIndex].component.inMultiComponent = true;
+
+            multiComponent.components.push({ nodeId, component, index: componentIndex });
 
             updateMultiComponentComponentsList(multiComponent, state, multiIndex);
             updateExistingComponentsOptions(state);
@@ -104,7 +102,6 @@ function attachMultiComponentFormEvents(state, existingMultiComponent = null, mu
         }
     });
 
-    
     saveMultiComponentButton.addEventListener('click', () => {
         multiComponent.label = multiComponentNameInput.value.trim();
         if (!multiComponent.label) {
@@ -150,9 +147,8 @@ function updateMultiComponentComponentsList(multiComponent, state, multiIndex) {
                 Node ID: ${nodeId} | Type: "${component.type}"
             </div>
             <div class="button-group">
-                <button data-node-id="${nodeId}" data-component-index="${index}" data-multi-index="${multiIndex}" class="edit-component-button">Edit</button>
-                <button data-node-id="${nodeId}" data-component-index="${index}" class="remove-component-button">Remove</button>
-                <button data-node-id="${nodeId}" data-component-index="${index}" class="delete-component-button">Delete</button>
+                <button data-component-index="${index}" data-multi-index="${multiIndex !== null ? multiIndex : ''}" class="edit-component-button">Edit</button>
+                <button data-component-index="${index}" class="remove-component-button">Remove</button>
             </div>
         `;
 
@@ -165,18 +161,20 @@ function updateMultiComponentComponentsList(multiComponent, state, multiIndex) {
 function attachComponentItemEvents(multiComponent, state, multiIndex) {
     const editButtons = document.querySelectorAll('#multiComponentComponentsList .edit-component-button');
     const removeButtons = document.querySelectorAll('#multiComponentComponentsList .remove-component-button');
-    const deleteButtons = document.querySelectorAll('#multiComponentComponentsList .delete-component-button');
 
     editButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
             const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
             const multiIndexAttr = button.getAttribute('data-multi-index');
-            const multiIdx = multiIndexAttr !== null && multiIndexAttr !== undefined ? parseInt(multiIndexAttr, 10) : null;
-            const component = state.assignedComponents[nodeId][componentIndex];
+            const multiIdx = multiIndexAttr !== '' ? parseInt(multiIndexAttr, 10) : null;
+            const assignedComp = state.assignedComponents[componentIndex];
+            if (!assignedComp) {
+                alert('Component not found.');
+                return;
+            }
+            const { nodeId, component } = assignedComp;
             const nodeInfo = state.nodeToCustomNodeMap[nodeId];
-            
-            
+
             nodeSelectDisplayComponentForm(
                 nodeId,
                 nodeInfo,
@@ -184,57 +182,38 @@ function attachComponentItemEvents(multiComponent, state, multiIndex) {
                 component,
                 componentIndex,
                 'componentsList',
-                multiIdx 
+                multiIdx
             );
         });
     });
 
     removeButtons.forEach(button => {
         button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
             const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
-            removeComponentFromMultiComponent(multiComponent, nodeId, componentIndex, state);
-            updateComponentsList(state);
-        });
-    });
-
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const nodeId = button.getAttribute('data-node-id');
-            const componentIndex = parseInt(button.getAttribute('data-component-index'), 10);
-            deleteComponentFromMultiComponent(multiComponent, nodeId, componentIndex, state);
+            removeComponentFromMultiComponent(multiComponent, componentIndex, state);
             updateComponentsList(state);
         });
     });
 }
 
-function removeComponentFromMultiComponent(multiComponent, nodeId, componentIndex, state) {
+function removeComponentFromMultiComponent(multiComponent, componentIndex, state) {
     multiComponent.components = multiComponent.components.filter(
-        item => !(item.nodeId === nodeId && item.index === componentIndex)
+        item => item.index !== componentIndex
     );
-    state.assignedComponents[nodeId][componentIndex].inMultiComponent = false;
-    updateExistingComponentsOptions(state);
-    updateMultiComponentComponentsList(multiComponent, state, null);
-    updateComponentsList(state);
-}
 
-function deleteComponentFromMultiComponent(multiComponent, nodeId, componentIndex, state) {
-    multiComponent.components = multiComponent.components.filter(
-        item => !(item.nodeId === nodeId && item.index === componentIndex)
-    );
-    state.assignedComponents[nodeId].splice(componentIndex, 1);
-    if (state.assignedComponents[nodeId].length === 0) delete state.assignedComponents[nodeId];
-    updateExistingComponentsOptions(state);
+    state.assignedComponents[componentIndex].component.inMultiComponent = false;
+
     updateMultiComponentComponentsList(multiComponent, state, null);
-    updateWorkflowConfig(state);
-    updateComponentsList(state);
+    updateExistingComponentsOptions(state);
 }
 
 function deleteMultiComponent(multiIndex, state) {
     const multiComponent = state.multiComponents[multiIndex];
 
-    multiComponent.components.forEach(({ nodeId, index }) => {
-        state.assignedComponents[nodeId][index].inMultiComponent = false;
+    multiComponent.components.forEach(({ index }) => {
+        if (state.assignedComponents[index]) {
+            state.assignedComponents[index].component.inMultiComponent = false;
+        }
     });
 
     state.multiComponents.splice(multiIndex, 1);
@@ -262,7 +241,9 @@ function attachMultiComponentListEventListeners(state) {
     deleteMultiButtons.forEach(button => {
         button.addEventListener('click', () => {
             const multiIndex = parseInt(button.getAttribute('data-multi-index'), 10);
-            deleteMultiComponent(multiIndex, state);
+            if (confirm(`Are you sure you want to delete the MultiComponent '${state.multiComponents[multiIndex].label}'?`)) {
+                deleteMultiComponent(multiIndex, state);
+            }
         });
     });
 }

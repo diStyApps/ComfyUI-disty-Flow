@@ -1,6 +1,4 @@
 import { componentTypes } from '/core/js/common/scripts/componentTypes.js';
-import { getSortOrderForNodeType } from './componentHandler.js';
-
 function updateWorkflowConfig(state) {
     const workflowConfigElement = document.getElementById('workflowConfig');
     const saveOptionsElement = document.getElementById('saveOptions');
@@ -8,7 +6,8 @@ function updateWorkflowConfig(state) {
 
     const workflowConfig = buildWorkflowConfig(state);
     const isCompactFormat = isCompactFormatSelected();
-    const isLeanFormat = isLeanFormatSelected();     const indentation = isCompactFormat ? 0 : 2;
+    const isLeanFormat = isLeanFormatSelected();
+    const indentation = isCompactFormat ? 0 : 2;
     const fullConfigJSON = JSON.stringify(workflowConfig, null, indentation);
 
     workflowConfigElement.textContent = fullConfigJSON;
@@ -25,45 +24,42 @@ function buildWorkflowConfig(state) {
         url: state.flowUrl || "linker",
         description: flowDescriptionInput.value || "Flow linker"
     };
-        Object.keys(componentTypes).forEach(type => {
+    Object.keys(componentTypes).forEach(type => {
         const pluralType = `${type}s`;
         if (type !== 'multiComponent') {
             workflowConfig[pluralType] = [];
         }
     });
 
-        const sortedNodes = Object.entries(state.assignedComponents || {})
-        .sort((a, b) => {
-            const nodeTypeA = state.nodeToCustomNodeMap[a[0]]?.classType;
-            const nodeTypeB = state.nodeToCustomNodeMap[b[0]]?.classType;
-            return getSortOrderForNodeType(nodeTypeA) - getSortOrderForNodeType(nodeTypeB);
+    const multiComponentIndices = new Set();
+    state.multiComponents.forEach(multiComponent => {
+        multiComponent.components.forEach(({ index }) => {
+            multiComponentIndices.add(index);
         });
+    });
 
-        for (const [nodeId, components] of sortedNodes) {
-        components.forEach(component => {
-            if (component.inMultiComponent) return;
+    state.assignedComponents.forEach(({ nodeId, component }, index) => {
+        if (component.inMultiComponent) return;
 
-            const { type, params } = component;
-            const fieldName = `${type}s`;
+        const { type, params } = component;
+        const fieldName = `${type}s`;
 
-            if (!workflowConfig[fieldName]) return;
+        if (!workflowConfig[fieldName]) return;
 
-            params.id = ensureUniqueComponentId(workflowConfig[fieldName], params.id);
-            const componentData = extractComponentData(component, type);
+        params.id = ensureUniqueComponentId(workflowConfig[fieldName], params.id);
+        const componentData = extractComponentData(component, type);
 
-            if (type === 'dimensionSelector') {
-                componentData.nodePath = `${nodeId}.inputs`;
-            }
-            workflowConfig[fieldName].push(componentData);
+        if (type === 'dimensionSelector') {
+            componentData.nodePath = `${nodeId}.inputs`;
+        }
+        workflowConfig[fieldName].push(componentData);
+    });
 
-        });
-    }
-
-        if (state.multiComponents && state.multiComponents.length > 0) {
+    if (state.multiComponents && state.multiComponents.length > 0) {
         workflowConfig.multiComponents = state.multiComponents.map(multiComponent => {
             const componentGroups = {};
 
-            multiComponent.components.forEach(({ nodeId, component }) => {
+            multiComponent.components.forEach(({ component, index }) => {
                 const { type } = component;
                 const componentData = extractComponentData(component, type);
 
@@ -84,7 +80,8 @@ function buildWorkflowConfig(state) {
         });
     }
 
-        const isLeanFormat = isLeanFormatSelected();     if (isLeanFormat) {
+    const isLeanFormat = isLeanFormatSelected();     
+    if (isLeanFormat) {
         removeEmptyFields(workflowConfig, ['id', 'name', 'url', 'description']);
     }
 
@@ -308,7 +305,6 @@ async function previewFlow(workflowConfigElement, state) {
                 window.parent.postMessage({ type: 'loadFlow', flowUrl: "linker" }, '*');
 
             })            
-            
             .catch(() => alert('Failed to save configuration. Please try again.'));
     } catch (error) {
         console.error('Error during preview:', error);
