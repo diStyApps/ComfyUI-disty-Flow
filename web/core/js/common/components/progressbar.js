@@ -2,7 +2,7 @@
   const progressBarHTML = `
     <div id="loading-area">
       <div id="spinner"></div>
-      <progress id="main-progress" class="progress" value="0" max="100"></progress>
+      <progress id="main-progress" class="progress" value="0" max="10000"></progress>
       <div id="queue-display"></div>
       <div id="buttonsgen">
         <button id="generateButton" class="menuButtons">GENERATE</button>

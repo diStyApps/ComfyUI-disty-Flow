@@ -1,4 +1,3 @@
-
 import { WebSocketHandler } from './webSocketHandler.js';
 import { updateProgress, displayImagesInDiv } from './imagedisplay.js';
 import { hideSpinner } from './utils.js';
@@ -35,6 +34,9 @@ class JSONMessageProcessor extends IMessageProcessor {
                     this.messageHandler.handleStatus();
                     break;
                 case 'executing':
+                case 'execution_start':
+                case 'execution_cached':
+                case 'execution_success':
                     break;
                 case 'execution_error':
                     hideSpinner();
@@ -85,11 +87,7 @@ class BlobMessageProcessor extends IMessageProcessor {
 
     async process(blob) {
         try {
-            // console.log('Processing Blob message:', blob);
-
             if (!blob.type) {
-                // console.warn('Blob type is empty. Attempting to detect MIME type.');
-
                 const headerSize = 8; 
                 if (blob.size <= headerSize) {
                     console.error('Blob size is too small to contain valid image data.');
@@ -98,11 +96,8 @@ class BlobMessageProcessor extends IMessageProcessor {
                 }
 
                 const slicedBlob = blob.slice(headerSize);
-                // console.log('Sliced Blob size:', slicedBlob.size);
-
                 const detectedType = await detectMimeType(slicedBlob);
                 if (detectedType) {
-                    // console.log('Detected MIME type:', detectedType);
                     this.messageHandler.handleMedia(URL.createObjectURL(slicedBlob), detectedType, false);
                 } else {
                     console.error('Could not detect MIME type of Blob.');
@@ -113,7 +108,6 @@ class BlobMessageProcessor extends IMessageProcessor {
 
             if (blob.type.startsWith('image/') || blob.type.startsWith('video/')) {
                 const objectURL = URL.createObjectURL(blob);
-                // console.log('Created Object URL:', objectURL);
                 this.messageHandler.handleMedia(objectURL, blob.type, true);
             } else {
                 console.error('Unsupported Blob type:', blob.type);
@@ -171,6 +165,10 @@ export class MessageHandler {
             }
         }
         hideSpinner();
+
+        // console.log('Execution completed:', data);
+        const event = new CustomEvent('jobCompleted');
+        window.dispatchEvent(event);
     }
 
     processImages(images) {
@@ -211,15 +209,16 @@ export class MessageHandler {
     }
 
     handleMedia(mediaUrl, mediaType, addToHistory = true) {
-        // console.log('Handling media:', mediaUrl, 'Type:', mediaType, 'Add to history:', addToHistory);
         displayImagesInDiv([mediaUrl], addToHistory);
     }
 
     handleInterrupted() {
         hideSpinner();
         console.log('Execution Interrupted');
-    }
 
+        const event = new CustomEvent('jobInterrupted');
+        window.dispatchEvent(event);
+    }
 
     handleStatus() {
         updateProgress();

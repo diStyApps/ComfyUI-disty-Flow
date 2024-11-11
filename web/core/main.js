@@ -1,10 +1,11 @@
+import StateManager from './js/common/scripts/stateManager.js';
 import MultiComponent from './js/common/components/MultiComponent.js';
-import InputComponent from "./js/common/components/InputComponent.js"
-import ToggleComponent from "./js/common/components/ToggleComponent.js"
-import Seeder from "./js/common/components/Seeder.js"
-import Stepper from "./js/common/components/Stepper.js"
-import MultiStepper from "./js/common/components/MultiStepper.js"
-import DropdownStepper from "./js/common/components/DropdownStepper.js"
+import InputComponent from "./js/common/components/InputComponent.js";
+import ToggleComponent from "./js/common/components/ToggleComponent.js";
+import Seeder from "./js/common/components/Seeder.js";
+import Stepper from "./js/common/components/Stepper.js";
+import MultiStepper from "./js/common/components/MultiStepper.js";
+import DropdownStepper from "./js/common/components/DropdownStepper.js";
 import DimensionSelector from './js/common/components/DimSelector.js';
 import Dropdown from './js/common/components/Dropdown.js';
 import imageLoaderComp from './js/common/components/imageLoaderComp.js';
@@ -18,6 +19,8 @@ import { setFaviconStatus } from './js/common/scripts/favicon.js';
 import { PreferencesManager } from './js/common/scripts/preferences.js';
 import ThemeManager from './js/common/scripts/ThemeManager.js';
 import injectStylesheet from './js/common/scripts/injectStylesheet.js';
+import LoraWorkflowManager from './js/common/components/LoraWorkflowManager.js';
+// import { api } from "../../scripts/api.js";
 
 import { checkAndShowMissingPackagesDialog } from './js/common/components/missingPackagesDialog.js';
 
@@ -48,27 +51,20 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         console.log('Default flow name: linker');
         return 'linker';
     }
-    
+    // let response = await api.fetchApi("/manager/reboot");
     const flowName = getFlowName();
-
     const client_id = uuidv4();
     const flowConfig = await fetchflowConfig(flowName);
     let workflow = await fetchWorkflow(flowName);
 
-    // const client_id = uuidv4();
-    // const flowConfig = await fetchflowConfig();
-    // let workflow = await fetchWorkflow();
     const seeders = [];
-    let jobQueue = [];
-    let currentJobId = 0;
-    let isProcessing = false;
     initializeWebSocket(client_id);
     setFaviconStatus.Default();
     injectStylesheet('/core/css/main.css', 'main');
     injectStylesheet('/core/css/themes.css', 'themes-stylesheet');
 
-    console.log("flowConfig", flowConfig)
-    console.log("workflow", workflow)
+    console.log("flowConfig", flowConfig);
+    console.log("workflow", workflow);
 
     const defaultPreferences = {
         selectedCategories: [],
@@ -85,172 +81,10 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     const themeManager = new ThemeManager(preferencesManager);
     themeManager.init();
 
-
-    class LoraWorkflowManager {
-
-        constructor(workflow, flowConfig) {
-            this.workflowManager = new WorkflowNodeAdder(workflow);
-            this.flowConfig = flowConfig;
-            this.container = document.getElementById('side-workflow-controls');
-            this.addButton = null;
-            this.initializeUI();
-        }
-
-        initializeUI() {
-            this.addButton = document.createElement('button');
-            this.addButton.textContent = '+LoRA';
-            this.addButton.classList.add('add-lora-button'); 
-            // this.addButton.style.marginBottom = '10px';
-            this.container.appendChild(this.addButton); 
-            this.addButton.addEventListener('click', () => this.handleAddLora());
-        }
-
-        handleAddLora() {
-            try {
-                const newNodeId = this.workflowManager.addLora();
-
-                const dynamicConfig = this.createDynamicConfig(newNodeId);
-
-                const loraContainer = document.createElement('div');
-                loraContainer.id = dynamicConfig.id;
-                loraContainer.classList.add('dropdown-stepper-container');
-                this.container.appendChild(loraContainer);
-                new DropdownStepper(dynamicConfig, this.workflowManager.getWorkflow());
-
-            } catch (error) {
-                console.error('Error adding LoRA:', error);
-            }
-        }
-
-        createDynamicConfig(nodeId) {
-            return {
-                id: `LoraLoader_${nodeId}`,
-                label: "LoRA",
-                dropdown: {
-                    url: "LoraLoaderModelOnly",
-                    key: "lora_name",
-                    nodePath: `${nodeId}.inputs.lora_name`
-                },
-                steppers: [
-                    {
-                        id: `lorastrength_${nodeId}`,
-                        label: "Strength",
-                        minValue: 0,
-                        maxValue: 5,
-                        step: 0.01,
-                        defValue: 1,
-                        precision: 2,
-                        scaleFactor: 1,
-                        container: `lorastrength_container_${nodeId}`,
-                        nodePath: `${nodeId}.inputs.strength_model`
-                    }
-                ]
-            };
-        }
-
-        getWorkflow() {
-            return this.workflowManager.getWorkflow();
-        }
-    }
-
-    class WorkflowNodeAdder {
-
-        constructor(workflow) {
-            if (typeof workflow !== 'object' || workflow === null || Array.isArray(workflow)) {
-                throw new TypeError('Workflow must be a non-null object');
-            }
-            this.workflow = { ...workflow };
-            this.existingIds = new Set(Object.keys(this.workflow).map(id => parseInt(id, 10)));
-            this.highestId = this._getHighestNodeId();
-            this.loraCount = this._countExistingLoras();
-        }
-      
-        addLora() {
-            const newLoraId = this._getNextNodeId();
-            const loraNode = this._createLoraNode(newLoraId);
-      
-            const existingLoras = this._findLoraNodes();
-      
-            if (existingLoras.length === 0) {
-                const modelLoaders = this._findModelLoaders();
-                if (modelLoaders.length === 0) {
-                    throw new Error('No model loader found in the workflow to attach LoRA');
-                }
-      
-                modelLoaders.forEach(loader => {
-                    const originalModelInput = loader.inputs.model;
-                    loader.inputs.model = [newLoraId.toString(), 0];
-                    loraNode.inputs.model = originalModelInput;
-                });
-            } else {
-                const lastLora = existingLoras[existingLoras.length - 1];
-                const originalModelInput = lastLora.inputs.model;
-                lastLora.inputs.model = [newLoraId.toString(), 0];
-                loraNode.inputs.model = originalModelInput;
-            }
-      
-            this.workflow[newLoraId.toString()] = loraNode;
-            this.existingIds.add(newLoraId);
-            this.highestId = newLoraId;
-            this.loraCount += 1;
-
-            return newLoraId;
-        }
-
-        getWorkflow() {
-            return this.workflow;
-        }
-      
-        _createLoraNode(id) {
-            return {
-                inputs: {
-                    lora_name: "lora.safetensors",
-                    strength_model: 1,
-                    model: []
-                },
-                class_type: "LoraLoaderModelOnly",
-                _meta: {
-                    title: "LoraLoaderModelOnly"
-                }
-            };
-        }
-      
-
-        _findLoraNodes() {
-            return Object.entries(this.workflow)
-                .filter(([_, node]) => node.class_type === "LoraLoaderModelOnly")
-                .map(([id, node]) => ({ id: parseInt(id, 10), ...node }));
-        }
-      
-        _findModelLoaders() {
-            const modelLoaders = [];
-      
-            Object.entries(this.workflow).forEach(([id, node]) => {
-                if (node.inputs && Array.isArray(node.inputs.model) && node.inputs.model.length === 2) {
-                    modelLoaders.push({ id: parseInt(id, 10), ...node });
-                }
-            });
-      
-            return modelLoaders;
-        }
-      
-        _getNextNodeId() {
-            return this.highestId + 1;
-        }
-      
-        _getHighestNodeId() {
-            return Math.max(...this.existingIds, 0);
-        }
-      
-        _countExistingLoras() {
-            return this._findLoraNodes().length;
-        }
-    }
-
     function generateWorkflowControls(config) {
         const container = document.getElementById('side-workflow-controls');
 
-        console.log("config", config)
+        console.log("config", config);
 
         if (config.dropdowns && Array.isArray(config.dropdowns)) {
             config.dropdowns.forEach(dropdown => {
@@ -309,27 +143,13 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
                 const div = document.createElement('div');
                 div.id = config.id;
                 div.classList.add('multi-component-container');
+                container.appendChild(div);
             });
         }
-
-        // if (config.multiSteppers && Array.isArray(config.multiSteppers)) {
-        //     config.multiSteppers.forEach(multiStepper => {
-        //         const div = document.createElement('div');
-        //         div.id = multiStepper.id;
-        //         div.classList.add('multi-stepper-container');
-        //         container.appendChild(div);
-        //     });
-        // }
-        // config.dropdownSteppers.forEach(dropdownStepper => {
-        //     const div = document.createElement('div');
-        //     div.id = dropdownStepper.id;
-        //     div.classList.add('dropdown-stepper-container');
-        //     container.appendChild(div);
-        // });
     }
 
     function setPromptComponents(config, options = { clearInputs: false }) {
-        if  (!config.prompts || !Array.isArray(config.prompts)) {
+        if (!config.prompts || !Array.isArray(config.prompts)) {
             return;
         }
         const promptsContainer = document.getElementById('prompts');
@@ -384,13 +204,13 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         });
     }
 
-    if(flowConfig.steppers) {
+    if (flowConfig.steppers) {
         flowConfig.steppers.forEach(config => {
             new Stepper(config, workflow);
         });
     }
 
-    if(flowConfig.dimensionSelectors) {
+    if (flowConfig.dimensionSelectors) {
         flowConfig.dimensionSelectors.forEach(config => {
             new DimensionSelector(config, workflow);
         });
@@ -402,13 +222,13 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         });
     }
 
-    if(flowConfig.toggles) {
+    if (flowConfig.toggles) {
         flowConfig.toggles.forEach(config => {
             new ToggleComponent(config, workflow);
         });
     }
 
-    if(flowConfig.seeders) {
+    if (flowConfig.seeders) {
         flowConfig.seeders.forEach(config => {
             const seeder = new Seeder(config, workflow);
             seeders.push(seeder);
@@ -421,61 +241,75 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         });
     }
 
-    // if (flowConfig.multiSteppers){
-    // flowConfig.multiSteppers.forEach(config => {
-    //     new MultiStepper(config, workflow);
-    // });
-    // }
-    // flowConfig.dropdownSteppers.forEach(config => {
-    //     new DropdownStepper(config, workflow);
-    // });
-    
     imageLoaderComp(flowConfig, workflow);
 
-    async function queue() {
-        if(flowConfig.prompts) {
+    function updateQueueDisplay(jobQueue) {
+        const queueDisplay = document.getElementById('queue-display');
+        if (!queueDisplay) {
+            console.warn('queue-display element not found in the DOM.');
+            return;
+        }
+        if (jobQueue.length > 0) {
+           queueDisplay.textContent = `${jobQueue.length}`;
 
-        flowConfig.prompts.forEach(pathConfig => {
-            const { id } = pathConfig;
-            const element = document.getElementById(id);
-            if (element) {
-                const value = element.value.replace(/(\r\n|\n|\r)/gm, " ");
-                updateWorkflowValue(workflow, id, value, flowConfig);
-            } else {
-                console.warn(`Element not found for ID: ${id}`);
-            }
-        });
+         } else {
+            queueDisplay.textContent = '';
+        }
+
+        // if (jobQueue.length > 0) {
+        //     const jobIds = jobQueue.map(job => job.id).join(', ');
+        //     queueDisplay.textContent += ` (Job IDs: ${jobIds})`;
+        // }
     }
-        const jobId = ++currentJobId;
+
+    async function queue() {
+        if (flowConfig.prompts) {
+            flowConfig.prompts.forEach(pathConfig => {
+                const { id } = pathConfig;
+                const element = document.getElementById(id);
+                if (element) {
+                    const value = element.value.replace(/(\r\n|\n|\r)/gm, " ");
+                    updateWorkflowValue(workflow, id, value, flowConfig);
+                } else {
+                    console.warn(`Element not found for ID: ${id}`);
+                }
+            });
+        }
+        const jobId = StateManager.incrementJobId();
         const job = { id: jobId, workflow: { ...workflow } };
-        console.log("queued workflow", workflow);
-        jobQueue.push(job);
+        StateManager.addJob(job);
         console.log(`Added job to queue. Job ID: ${jobId}`);
-        console.log("Current queue:", jobQueue);
-                console.log("queued workflow", workflow);
+        console.log("Current queue:", StateManager.getJobQueue());
+
+        updateQueueDisplay(StateManager.getJobQueue());
         
-        if (!isProcessing) {
+        if (!StateManager.isProcessing()) {
+            setTimeout(processQueue, 0);
+        }
+    }
+
+    async function processQueue() {
+        if (StateManager.isProcessing()) return;
+        
+        if (StateManager.getJobQueue().length === 0) {
+            return;
+        }
+
+        StateManager.setProcessing(true);
+
+        const job = StateManager.getNextJob();
+        console.log(`Processing job ${job.id}`);
+        try {
+            await queue_prompt(job.workflow);
+        } catch (error) {
+            console.error(`Error processing job ${job.id}:`, error);
+            StateManager.removeJob();
+            updateQueueDisplay(StateManager.getJobQueue());
+            StateManager.setProcessing(false);
             processQueue();
         }
     }
-    
-    async function processQueue() {
-        if (isProcessing) return;
-        
-        isProcessing = true;
-        while (jobQueue.length > 0) {
-            const job = jobQueue[0];
-            console.log(`Processing job ${job.id}`);
-            try {
-                await queue_prompt(job.workflow);
-            } catch (error) {
-                console.error(`Error processing job ${job.id}:`, error);
-            }
-            jobQueue.shift();
-        }
-        isProcessing = false;
-    }
-    
+
     async function queue_prompt(prompt = {}) {
         showSpinner();
         seeders.forEach(seeder => seeder.generateSeed());
@@ -501,18 +335,21 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             throw error;
         }
     }
-    
+
     async function interrupt() {
-        if (jobQueue.length > 0) {
-            const removedJob = jobQueue.pop();
+        await queue_interrupt();
+        if (StateManager.isProcessing()) {
+            console.log("Interrupting current job");
+        } else if (StateManager.getJobQueue().length > 0) {
+            const removedJob = StateManager.getJobQueue().pop();
             console.log(`Removed job from queue. Job ID: ${removedJob.id}`);
-            console.log("Remaining queue:", jobQueue);
+            console.log("Remaining queue:", StateManager.getJobQueue());
+            updateQueueDisplay(StateManager.getJobQueue());
         } else {
             console.log("No jobs in queue to interrupt.");
         }
-        await queue_interrupt();
     }
-    
+
     async function queue_interrupt() {
         showSpinner('Interrupting...');
         const data = { 'client_id': client_id };
@@ -536,15 +373,29 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             // hideSpinner();
         }
     }
-    
+
     document.getElementById('generateButton').addEventListener('click', function () {
         console.log("Queueing new job");
         queue();
     });
-    
+
     document.getElementById('interruptButton').addEventListener('click', function () {
         console.log("Interrupting last job");
         interrupt();
+    });
+
+    window.addEventListener('jobCompleted', () => {
+        StateManager.removeJob();
+        updateQueueDisplay(StateManager.getJobQueue());
+        StateManager.setProcessing(false);
+        processQueue();
+    });
+
+    window.addEventListener('jobInterrupted', () => {
+        StateManager.removeJob();
+        updateQueueDisplay(StateManager.getJobQueue());
+        StateManager.setProcessing(false);
+        processQueue();
     });
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -555,5 +406,4 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             overlay.style.display = 'none';
         });
     });
-
 })(window, document, undefined);
