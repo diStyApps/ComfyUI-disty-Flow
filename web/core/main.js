@@ -20,7 +20,6 @@ import { PreferencesManager } from './js/common/scripts/preferences.js';
 import ThemeManager from './js/common/scripts/ThemeManager.js';
 import injectStylesheet from './js/common/scripts/injectStylesheet.js';
 import LoraWorkflowManager from './js/common/components/LoraWorkflowManager.js';
-// import { api } from "../../scripts/api.js";
 
 import { checkAndShowMissingPackagesDialog } from './js/common/components/missingPackagesDialog.js';
 
@@ -134,15 +133,6 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
                 const div = document.createElement('div');
                 div.id = seeder.id;
                 div.classList.add('seeder-container');
-                container.appendChild(div);
-            });
-        }
-
-        if (config.multiComponents && Array.isArray(config.multiComponents)) {
-            config.multiComponents.forEach(config => {
-                const div = document.createElement('div');
-                div.id = config.id;
-                div.classList.add('multi-component-container');
                 container.appendChild(div);
             });
         }
@@ -263,6 +253,7 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     }
 
     async function queue() {
+        console.log("Queueing workflow:" , workflow);
         if (flowConfig.prompts) {
             flowConfig.prompts.forEach(pathConfig => {
                 const { id } = pathConfig;
