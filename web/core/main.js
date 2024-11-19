@@ -168,7 +168,7 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
 
     function generateDynamicScriptDefault(index) {
         const defaultsPrompts = [
-            'A cartoon happy goat with purple eyes and a black horn in the jungle',
+            'A cartoon cute happy white female goat with purple eyes and a black horn in the jungle',
             'ugly, blur, jpeg artifacts, low quality, lowres, child',
         ];
         return defaultsPrompts[index] || ''; 

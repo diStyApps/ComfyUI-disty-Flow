@@ -44,6 +44,8 @@ const categoryKeywords = [
     'Inpaint',
     'Detailer',
     'Canvas',
+    'Remover',
+    'Background',
 ];
 
 const defaultPreferences = {
