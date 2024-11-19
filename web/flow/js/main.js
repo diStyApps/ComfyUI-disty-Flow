@@ -20,8 +20,8 @@ const priorityFlowIds = [
     'n0y8e',
     'yigqn',
     '12slf',
-
-    
+    '28s1h',
+    '67e3l',
 ]; 
 
 const categoryKeywords = [
@@ -39,8 +39,11 @@ const categoryKeywords = [
     'GGUF',
     'Pulid',
     'CogVideoX',
-    'Mochi'
-    
+    'Mochi',
+    'Paint',
+    'Inpaint',
+    'Detailer',
+    'Canvas',
 ];
 
 const defaultPreferences = {
