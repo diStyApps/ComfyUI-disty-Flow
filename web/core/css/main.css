@@ -174,7 +174,7 @@ header .right {
     display: flex;
     flex: 1;
     text-align: left;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .content div {
@@ -194,6 +194,10 @@ header .right {
     flex: 1.1;
     background-color: var(--color-background);
 }
+.content .right-col {
+    flex: 0.5;
+    background-color: var(--color-background);
+}
 
 .content .mid-col {
     flex: 2.5;
@@ -201,11 +205,64 @@ header .right {
     border-right: 1px dashed var(--color-border);
     justify-content: space-around;
     min-height: 100%;
+    padding: 10px;
+    /* padding: 4px 6px; */
+
 }
 
-.content .right-col {
-    flex: 0.5;
-    background-color: var(--color-background);
+.canvas-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* height: 100% !important; */
+    /* width: 100% !important; */
+    /* background: var(--color-button-primary-active); */
+}
+
+#canvasContainer:focus {
+    border: 2px solid #4A90E2;
+}
+
+#imageCanvas {
+    /* width: 100%; */
+    /* height: 100%; */
+    display: block;
+    /* position: absolute; */
+    /* top: 0; */
+    /* left: 0; */
+    /* background: green; */
+    overflow: hidden;
+    padding: 0;
+
+}
+
+/* Green dashed border around the canvas wrapper */
+#canvasWrapper {
+    /* position: relative; */
+    flex: 1; 
+    /* width: 100%; */
+    /* height: 100%; */
+    overflow: hidden;
+    /* background-color: var(--color-background-secondary); */
+    border: 1px dashed var(--color-border);
+    box-sizing: border-box;
+    /* width: 800px;  */
+    /* height: 600px;  */
+    position: relative;
+    margin: 0; /* Remove default margins */
+    padding: 10px;
+}
+
+.brush-ui-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    background-color: var(--color-button-primary-text-hover);
+    color: var(--color-primary-text);
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    margin-bottom: 10px;
 }
 
 #control button {
@@ -676,7 +733,7 @@ select option:hover {
     height: 100%;
     position: relative;
     object-fit: contain;
-    border: 2px dashed var(--color-border);
+    border: 1px dashed var(--color-border);
     border-radius: 5px;
 }
 #batch-images-container {
@@ -1547,3 +1604,355 @@ html:not(.css-loading) body {
     background: var(--color-background-secondary);
     margin-bottom: 4px;
 }
+.plugin-ui-container {
+    background: var(--color-background-secondary);
+    padding: 4px;
+    /* position: absolute; */
+    /* top: 100px; */
+    /* left: 19%; */
+    z-index: 1000;
+    transition: width 0.3s, height 0.3s;
+    display: flex;
+    flex-direction: row;
+    /* justify-content: space-between; */
+    align-items: stretch;
+    /* border: 1px dashed var(--color-border); */
+    margin: 5px;
+}
+/* Style for the plugin UI container */
+#pluginUIContainer {
+    /* padding: 10px; */
+    /* background-color: var(--color-background-secondary); */
+    /* Adjust as needed */
+}
+
+/* Parent container for the canvas */
+/* #canvasContainer {
+    position: relative;
+    width: 100%;
+    height: calc(100% - 60px); 
+    border: 1px solid #ccc; 
+    box-sizing: border-box;
+} */
+
+/* Make the canvas fill its parent container */
+/* #imageCanvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block; 
+    background: var(--color-progress-background);    
+    
+} */
+
+           /* CSS Isolation: Prefix all classes with 'cbp-' */
+           .cbp-brush-ui-container {
+            background-color: var(--color-background);
+            user-select: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            color: var(--color-text);
+            position: absolute;
+            top: 100px;
+            left: 19%;
+            z-index: 1000;
+            transition: width 0.3s, height 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+
+            border: 1px dashed var(--color-border);
+        }
+        .cbp-brush-ui-header {
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: var(--color-header-background);
+            border-bottom: 1px dashed var(--color-border);
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        .cbp-brush-ui-title {
+            font-weight: bold;
+        }
+        .cbp-brush-ui-minimize-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            color: var(--color-text);
+            display: none;
+        }
+        .cbp-brush-ui-content {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .cbp-brush-ui-content label {
+            display: flex;
+            flex-direction: column;
+            font-size: 12px;
+            gap: 4px;
+        }
+        .cbp-brush-ui-content input[type="range"],
+        .cbp-brush-ui-content input[type="number"],
+        .cbp-brush-ui-content input[type="color"],
+        .cbp-brush-ui-content button {
+            width: 100%;
+            height: 30px;
+            box-sizing: border-box;
+            padding: 4px;
+            /* border: 1px solid #ccc; */
+            /* border-radius: 4px; */
+            font-size: 14px;
+        }
+
+        .cbp-brush-ui-toggle-btn {
+            flex: 2; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--color-button-primary);
+            border: none;
+            cursor: pointer;
+            padding: 4px !important;
+            height: 40px !important;
+            width: auto; 
+        }
+        #cbp-color-picker {
+            flex: 1;
+            height: auto;
+
+        }
+        #cbp-color-picker:hover {
+            border: 1px dashed var(--color-button-primary-text);
+        }
+        #cbp-toggle-btn-icon {
+            width: 70%;
+            height: 100%;
+            /* display: block; Ensures the SVG takes up space */
+        }
+        #cbp-toggle-drawing-mode-btn.active {
+            /* background: var(--color-button-primary-text); */
+            border: 1px dashed var(--color-button-primary-text) !important;
+        } 
+        #ui-toggle-btn.active {
+            background: var(--color-button-primary-text);
+            /* border: 1px dashed var(--color-button-secondary-text-active) !important; */
+
+        }
+        .cbp-brush-ui-color-picker {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+
+            width: 100%;
+            height: 100%;
+        }
+
+        .cbp-brush-ui-content input[type="color"] {
+            padding: 0;
+            /* border: none; */
+            background-color: var(--color-background);
+            outline: none;
+            -webkit-appearance: none; /* Removes default styling in WebKit browsers */
+            border-bottom: 1px dashed var(--color-border);
+
+        }
+        
+        /* Remove the color swatch border in WebKit browsers */
+        .cbp-brush-ui-content input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+            border: none;
+        }
+        
+        .cbp-brush-ui-content input[type="color"]::-webkit-color-swatch {
+            border: none;
+        }
+        
+        /* Remove the color swatch border in Firefox */
+        .cbp-brush-ui-content input[type="color"]::-moz-color-swatch {
+            border: none;
+        }
+        .cbp-brush-ui-minimized .cbp-brush-ui-content {
+            display: none;
+        }
+        .cbp-brush-ui-full {
+            width: 155px;
+            height: auto;
+        }
+        .cbp-brush-ui-mini {
+            width: 80px;
+            height: auto;
+        }
+        .cbp-brush-ui-minimized {
+            width: 60px;
+            height: auto;
+        }
+        .cbp-brush-ui-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .cbp-brush-ui-input-group input {
+            flex: 1;
+        }
+        .cbp-hidden-cursor {
+            cursor: none !important;
+        }
+
+
+
+
+        .mbp-container * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        
+        .mbp-container {
+            /* --mbp-primary: var(--color-button-primary);
+            --mbp-primary-hover: var(--color-button-primary-hover);
+            --mbp-bg: var(--color-background-secondary);
+            --mbp-border: var(--color-border);
+            --mbp-text: var(--color-primary-text);
+            --mbp-icon: var(--color-primary); */
+            padding: 0.5rem;
+        }
+
+        .mbp-header {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .mbp-header .mbp-select {
+            flex: 1;
+        }
+
+        .mbp-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border: 1px solid var(--mbp-border);
+            background: var(--color-button-primary) ;
+            /* border-radius: 0.375rem; */
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--mbp-icon);
+            min-width: 36px;
+            height: 36px;
+            width: 100%;
+        }
+
+        .mbp-button:hover {
+            background: var(--color-button-primary-hover);
+            color: var(--mbp-primary);
+        }
+
+        .mbp-button svg {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+
+        .mbp-select {
+            padding: 0.5rem;
+            border: none;
+            background: var(--color-background);
+            color: var(--mbp-text);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.25rem;
+            padding-right: 2.5rem;
+            height: 36px;
+            outline: none;
+        }
+        .mbp-select:hover {
+            /* background: var(--color-button-primary-hover); */
+            border-top: solid 1px var(--color-button-primary-hover);
+        }
+
+        .mbp-toggle-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0.75rem 0;
+            padding: 0.25rem 0;
+            display: none !important;
+
+        }
+
+        .mbp-toggle {
+            position: relative;
+            display: inline-block;
+            width: 3.5rem;
+            height: 1.75rem;
+            margin: 0;
+        }
+
+        .mbp-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            margin: 0;
+        }
+
+        .mbp-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            /* background-color: #e5e7eb; */
+            transition: .3s;
+            border-radius: 2rem;
+        }
+
+        .mbp-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 1.25rem;
+            width: 1.25rem;
+            left: 0.25rem;
+            bottom: 0.25rem;
+            /* background-color: white; */
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .mbp-toggle input:checked + .mbp-toggle-slider {
+            background-color: var(--mbp-primary);
+        }
+
+        .mbp-toggle input:checked + .mbp-toggle-slider:before {
+            transform: translateX(1.75rem);
+        }
+
+        .mbp-label {
+            font-size: 0.75rem;
+            color: var(--mbp-text);
+            user-select: none;
+            padding: 0 6px;
+        }
+
+        .mbp-button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin: 0.75rem 0;
+
+        }        

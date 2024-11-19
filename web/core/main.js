@@ -20,8 +20,9 @@ import { PreferencesManager } from './js/common/scripts/preferences.js';
 import ThemeManager from './js/common/scripts/ThemeManager.js';
 import injectStylesheet from './js/common/scripts/injectStylesheet.js';
 import LoraWorkflowManager from './js/common/components/LoraWorkflowManager.js';
-
+import { CanvasLoader } from './js/common/components/canvas/CanvasLoader.js';
 import { checkAndShowMissingPackagesDialog } from './js/common/components/missingPackagesDialog.js';
+import CanvasComponent from './js/common/components/CanvasComponent.js';
 
 (async (window, document, undefined) => {
 
@@ -46,15 +47,15 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             console.log('Flow name from URL path:', paths[1]);
             return paths[1];
         }
-        // Default flow name
         console.log('Default flow name: linker');
         return 'linker';
     }
-    // let response = await api.fetchApi("/manager/reboot");
+
     const flowName = getFlowName();
     const client_id = uuidv4();
     const flowConfig = await fetchflowConfig(flowName);
     let workflow = await fetchWorkflow(flowName);
+    let canvasLoader;
 
     const seeders = [];
     initializeWebSocket(client_id);
@@ -232,28 +233,31 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
     }
 
     imageLoaderComp(flowConfig, workflow);
-
-    function updateQueueDisplay(jobQueue) {
-        const queueDisplay = document.getElementById('queue-display');
-        if (!queueDisplay) {
-            console.warn('queue-display element not found in the DOM.');
-            return;
+    
+    const initCanvas = async () => {
+        canvasLoader = new CanvasLoader('imageCanvas', flowConfig);
+        await canvasLoader.initPromise;  // Wait for initialization to complete
+    
+        if (canvasLoader.isInitialized) {
+            console.log("Canvas initialized successfully with selected plugins.");
+        } else {
+            console.log("Canvas was not initialized due to missing flowConfig fields.");
         }
-        if (jobQueue.length > 0) {
-           queueDisplay.textContent = `${jobQueue.length}`;
+    };
+    
+    initCanvas();
 
-         } else {
-            queueDisplay.textContent = '';
+
+    async function queue() {   
+
+        if (canvasLoader && canvasLoader.isInitialized) {
+            await CanvasComponent(flowConfig, workflow, canvasLoader);
+        } else {
+            console.warn("Canvas is not initialized. Skipping CanvasComponent.");
         }
 
-        // if (jobQueue.length > 0) {
-        //     const jobIds = jobQueue.map(job => job.id).join(', ');
-        //     queueDisplay.textContent += ` (Job IDs: ${jobIds})`;
-        // }
-    }
+        console.log("Queueing workflow:", workflow);        
 
-    async function queue() {
-        console.log("Queueing workflow:" , workflow);
         if (flowConfig.prompts) {
             flowConfig.prompts.forEach(pathConfig => {
                 const { id } = pathConfig;
@@ -266,11 +270,13 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
                 }
             });
         }
+
         const jobId = StateManager.incrementJobId();
         const job = { id: jobId, workflow: { ...workflow } };
         StateManager.addJob(job);
         console.log(`Added job to queue. Job ID: ${jobId}`);
         console.log("Current queue:", StateManager.getJobQueue());
+        console.log("queued workflow:", workflow);        
 
         updateQueueDisplay(StateManager.getJobQueue());
         
@@ -324,7 +330,27 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         } catch (error) {
             console.error('Error processing prompt:', error);
             throw error;
+        } finally {
+            // hideSpinner();
         }
+    }
+    function updateQueueDisplay(jobQueue) {
+        const queueDisplay = document.getElementById('queue-display');
+        if (!queueDisplay) {
+            console.warn('queue-display element not found in the DOM.');
+            return;
+        }
+        if (jobQueue.length > 0) {
+           queueDisplay.textContent = `${jobQueue.length}`;
+
+         } else {
+            queueDisplay.textContent = '';
+        }
+
+        // if (jobQueue.length > 0) {
+        //     const jobIds = jobQueue.map(job => job.id).join(', ');
+        //     queueDisplay.textContent += ` (Job IDs: ${jobIds})`;
+        // }
     }
 
     async function interrupt() {
@@ -356,6 +382,7 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
             if (!response.ok) {
                 throw new Error('Failed to interrupt the process.');
             }
+
             const result = await response.json();
             console.log('Interrupted:', result);
         } catch (error) {
@@ -398,3 +425,4 @@ import { checkAndShowMissingPackagesDialog } from './js/common/components/missin
         });
     });
 })(window, document, undefined);
+

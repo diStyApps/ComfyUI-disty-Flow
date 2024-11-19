@@ -1,13 +1,17 @@
 <header></header>
 <div class="content" >
-    <div class="left-col">
+    <div class="left-col" style="display: block;">
         <div id="side-workflow-controls" class="custom-scrollbar"></div>
     </div>
     <div class="mid-col">
                 <div id="display-media-main">
+                    <div id="canvasWrapper" style="display: none;">
+                        <canvas id="imageCanvas"></canvas>
+                    </div>
                     <div id="image-container" class="custom-scrollbar"></div>
                 </div>
             <div id="controls">
+                <div id="pluginUIContainer" class="plugin-ui-container" style="display: none;"></div>
                 <div id="progressbar"></div>
                 <div id="prompts"></div>
             </div>

@@ -61,6 +61,8 @@ Flow is currently in the early stages of development, so expect bugs and ongoing
 
 <img src="web/core/media/git/flow_3.jpg">
 
+<img src="web/core/media/git/flow_5.jpg">
+
 <img src="web/core/media/git/flow_4.jpg">
 
 <img src="web/core/media/git/flow_1.jpg">
@@ -104,7 +106,8 @@ http://127.0.0.1:8188/flow
 - Enhanced Customization Options
 
 ### Feature Support
-- [ ] Inpainting Functionality
+- [x] Canvas / Masking / Inpainting Functionality
+- - [ ] Improved Canvas / Masking / Inpainting Functionality
 - [ ] Enhanced Media Handling
 - [x] Live Preview
 - [ ] Prompt Tracking

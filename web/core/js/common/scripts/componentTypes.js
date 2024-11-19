@@ -47,9 +47,16 @@ export const componentTypes = {
         { name: 'id', label: 'ID', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
     ],
-    'configCustomNode': [
-        { name: 'title', label: 'Title', type: 'text' },
-        { name: 'installUrl', label: 'Install URL', type: 'text' },
-        { name: 'downloadModal', label: 'Download Modal', type: 'textarea' },
+    'canvasOutput': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
     ],
+    'canvasLoadedImage': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],
+    'canvasSelectedMaskOutput': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],    
 };
