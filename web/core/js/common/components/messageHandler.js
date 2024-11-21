@@ -226,10 +226,11 @@ export class MessageHandler {
 }
 
 export function initializeWebSocket(clientId) {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
     const serverAddress = `${window.location.hostname}:${window.location.port}`;
     const messageHandler = new MessageHandler();
     const wsHandler = new WebSocketHandler(
-        `ws://${serverAddress}/ws?clientId=${encodeURIComponent(clientId)}`,
+        `${protocol}://${serverAddress}/ws?clientId=${encodeURIComponent(clientId)}`,
         (event) => messageHandler.handleMessage(event)
     );
     wsHandler.connect();
