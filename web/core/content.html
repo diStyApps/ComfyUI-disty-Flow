@@ -1,28 +1,51 @@
-<header></header>
-<div class="content" >
-    <div class="left-col" style="display: block;">
-        <div id="side-workflow-controls" class="custom-scrollbar"></div>
-    </div>
-    <div class="mid-col">
+    <!-- <div id="responsive-indicator"></div> -->
+    <div id="container" class="container">
+        <header></header>
+        <main class="content">
+            <aside class="left-col" id="left-col">
+                <button id="toggle-left" class="toggle-button left-toggle" aria-label="Toggle Left Panel">
+                <svg class="arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M16 19V5l-11 7z"/>
+                </svg>
+                </button>
+                <div class="left-panel-content">
+                    <div id="side-workflow-controls" class="custom-scrollbar"></div>
+
+                </div>
+            </aside>
+
+            <section class="main-area mid-col">
                 <div id="display-media-main">
                     <div id="canvasWrapper" style="display: none;">
                         <canvas id="imageCanvas"></canvas>
                     </div>
                     <div id="image-container" class="custom-scrollbar"></div>
                 </div>
-            <div id="controls">
-                <div id="pluginUIContainer" class="plugin-ui-container" style="display: none;"></div>
-                <div id="progressbar"></div>
-                <div id="prompts"></div>
-            </div>
-    </div>
-    <div class="right-col" >
-        <div id="history" class="custom-scrollbar">
-            <h2>Recent</h2>
-            <div id="images-container">
-            </div>
-        </div>
-    </div>
+                <div id="controls" class="custom-scrollbar">
+                    <div id="progressbar"></div>
+                    <div id="quick-controls"></div>
+                    <div id="pluginUIContainer" class="plugin-ui-container">
+                    </div>
+                    <div id="prompts"></div>
+                </div>
+            </section>
+
+            <aside class="sidebar right-col" id="right-col">
+                <button id="toggle-right" class="toggle-button right-toggle" aria-label="Toggle Right Panel">
+                    <svg class="arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                </button>
+                <div class="right-panel-content">
+                    <div id="history" class="custom-scrollbar">
+                        <div id="header"><h2>Recent</h2></div>
+                        <div id="images-container" class="custom-scrollbar">
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    <footer></footer>    
 </div>
-</div> 
-<footer></footer>    
+</body>
+</html>

@@ -1,4 +1,8 @@
+
+// MaskBrushPlugin.js
 import { CustomBrushPlugin } from './CustomBrushPlugin.js';
+import { MaskExportUtilities } from './MaskExportUtilities.js';
+import { store } from  '../../scripts/stateManagerMain.js';
 
 export class MaskBrushPlugin extends CustomBrushPlugin {
     constructor(options = {}) {
@@ -6,9 +10,11 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
 
         this.masks = [];
         this.currentMask = null;
-        this.maskStrokeHistory = {}; // { maskName: { undoStack: [], redoStack: [] } }
+        this.maskStrokeHistory = {};
         this.brushIcon = '/core/media/ui/double-face-mask.png';
-
+        this.isSubscribed = false;
+        this.resizeObserver = null;
+        this.clearMasksOnImageLoaded = options.clearMasksOnImageLoaded !== undefined ? options.clearMasksOnImageLoaded : true;
         this.onAddMask = this.onAddMask.bind(this);
         this.onChangeMask = this.onChangeMask.bind(this);
         this.onChangeMaskColor = this.onChangeMaskColor.bind(this);
@@ -23,11 +29,23 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.onWindowResize = this.onWindowResize.bind(this);
         this.onUndoMaskStroke = this.onUndoMaskStroke.bind(this);
         this.onRedoMaskStroke = this.onRedoMaskStroke.bind(this);
+        this.onImageModified = this.onImageModified.bind(this);
+        this.onClearMask = this.onClearMask.bind(this);
+        this.onClearAllMasks = this.onClearAllMasks.bind(this);
+        this.onToggleHideMask = this.onToggleHideMask.bind(this);
+        this.onToggleHideAllMasks = this.onToggleHideAllMasks.bind(this);
+        this.handleStateChange = this.handleStateChange.bind(this);
+        // this.enableDrawingMode = this.enableDrawingMode.bind(this);
+        this.disableDrawingMode = this.disableDrawingMode.bind(this);
+        this.onPanActivated = this.onPanActivated.bind(this);
+        this.onPanDeactivated = this.onPanDeactivated.bind(this);
+
+        this.maskExportUtilities = new MaskExportUtilities(this);
     }
 
     init(canvasManager) {
         super.init(canvasManager);
-        
+
         if (this.brushOpacityInput && this.brushOpacityInput.parentElement) {
             this.brushOpacityInput.parentElement.style.display = 'none';
         }
@@ -36,41 +54,55 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
 
         this.attachAdditionalEventListeners();
 
+        window.addEventListener('resize', this.onWindowResize);
+        
         this.canvasManager.on('image:loaded', this.onImageLoaded);
         this.canvasManager.on('canvas:state:changed', this.onCanvasStateChanged);
         this.canvasManager.on('undo:mask:stroke', this.onUndoMaskStroke);
         this.canvasManager.on('redo:mask:stroke', this.onRedoMaskStroke);
-
-        window.addEventListener('resize', this.onWindowResize);
-
         this.canvasManager.on('save:trigger', this.onHandleSaveFromCanvas);
+        // this.onToggleDrawingMode();
+        this.canvasManager.on('pan:activated', this.onPanActivated);
+        this.canvasManager.on('pan:deactivated', this.onPanDeactivated);
+        this.setupResizeObserver();
+    }
+
+    setupResizeObserver() {
+        const canvasContainer = this.canvas.getElement().parentElement;
+        if (!canvasContainer) {
+            console.error('Canvas container element not found.');
+            return;
+        }
+
+        this.resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (entry.target === canvasContainer) {
+                    this.onImageModified();
+                }
+            }
+        });
+
+        this.resizeObserver.observe(canvasContainer);
     }
 
     extendUI() {
-        const styleSheet = document.createElement('style');
-        styleSheet.textContent = `
-        
-        `;
-        document.head.appendChild(styleSheet);
-
         const temp = document.createElement('div');
         temp.innerHTML = `
             <div class="mbp-container">
-                    <div class="mbp-toggle-wrapper">
+                <div class="mbp-toggle-wrapper" style="display: none;">
                     <label for="applyColorToMaskCheckbox" class="mbp-label">Mask Color Fill</label>
                     <label class="mbp-toggle" for="applyColorToMaskCheckbox">
                         <input type="checkbox" id="applyColorToMaskCheckbox">
                         <span class="mbp-toggle-slider"></span>
                     </label>
-                    </div>     
-                <div class="mbp-header">
+                </div>
+                <div class="mbp-header" style="display: none;">
                     <select id="maskList" class="mbp-select">
                         <option value="" disabled selected>Select a mask</option>
                     </select>
                 </div>
-                
 
-                <div class="mbp-button-group">
+                <div class="mbp-button-group" style="display: none;">
                     <button id="addMaskBtn" class="mbp-button" title="Add New Mask">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -82,8 +114,8 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
                         </svg>
                     </button>
                 </div>
-                    <label for="" class="mbp-label">Mask Order</label>
-                <div class="mbp-button-group">
+                    <label for="" class="mbp-label" style="display: none;">Mask Order</label>
+                <div class="mbp-button-group" style="display: none;">
                     <button id="moveMaskUpBtn" class="mbp-button" title="Move Mask Up">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
@@ -96,17 +128,86 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
                     </button>
                 </div>
 
-                
-                <select id="saveOptionsSelect" class="mbp-select">
+                <div class="mbp-button-group" ">
+                    <button id="clearMaskBtn" class="mbp-button" title="Clear Mask" style="display: none;">
+                        Clear
+                    </button>
+                    <button id="clearAllMasksBtn" class="mbp-button" title="Clear All Masks">
+                        <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+                        width="512.000000pt" height="512.000000pt" viewBox="0 0 512.000000 512.000000"
+                        preserveAspectRatio="xMidYMid meet">
+
+                        <g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"
+                        fill="currentColor" stroke="none">
+                        <path d="M413 4049 c-69 -27 -147 -110 -168 -181 -19 -63 -19 -121 -2 -179 8
+                        -24 129 -228 270 -453 142 -226 253 -414 249 -418 -5 -5 -83 -49 -173 -99 -90
+                        -50 -175 -100 -188 -112 -41 -38 -71 -115 -71 -184 0 -57 5 -72 65 -187 l66
+                        -125 65 -318 c69 -336 71 -361 34 -432 -39 -77 -105 -119 -211 -136 -45 -7
+                        -72 -36 -72 -77 0 -49 35 -72 103 -65 135 12 252 93 312 214 54 109 51 170
+                        -21 518 -33 159 -59 291 -57 292 1 2 285 159 631 349 574 316 629 344 639 328
+                        6 -11 113 -203 237 -429 169 -305 224 -413 216 -421 -7 -6 -42 -27 -79 -47
+                        l-66 -36 -102 187 c-56 103 -111 195 -122 205 -43 36 -118 4 -118 -52 0 -12
+                        47 -108 105 -213 84 -153 103 -194 93 -203 -17 -15 -545 -305 -555 -305 -5 0
+                        -71 115 -147 255 -77 141 -145 260 -152 266 -20 17 -72 14 -94 -6 -38 -35 -27
+                        -68 120 -334 77 -140 137 -258 133 -261 -5 -4 -42 -26 -83 -48 l-76 -41 -84
+                        161 c-69 131 -90 163 -112 170 -37 13 -80 -9 -93 -46 -9 -26 0 -47 89 -220 54
+                        -105 108 -201 119 -213 12 -13 32 -23 48 -23 16 0 223 108 540 283 283 156
+                        575 317 649 357 151 84 170 99 170 137 0 24 -309 600 -607 1130 -81 145 -125
+                        193 -198 213 -91 25 -137 13 -331 -94 -97 -53 -181 -93 -185 -89 -4 4 -97 197
+                        -208 428 -110 231 -215 440 -233 465 -49 67 -139 110 -226 109 -42 0 -87 -8
+                        -119 -20z m206 -157 c27 -22 74 -113 258 -497 217 -457 250 -515 291 -515 10
+                        0 112 52 227 116 232 129 263 138 310 94 33 -31 99 -150 88 -161 -10 -10
+                        -1224 -679 -1233 -679 -3 0 -25 36 -49 81 -48 89 -50 128 -8 166 12 11 108 67
+                        212 124 202 110 235 134 235 172 0 13 -121 216 -285 477 -273 435 -285 456
+                        -285 503 0 130 139 199 239 119z"/>
+                        <path d="M3750 3114 c-98 -26 -179 -72 -255 -148 -97 -95 -147 -198 -170 -346
+                        -5 -33 -8 -36 -58 -48 -60 -14 -144 -69 -182 -118 -55 -72 -79 -142 -79 -231
+                        0 -74 3 -88 37 -156 59 -120 158 -190 286 -203 56 -6 64 -5 86 16 15 14 25 35
+                        25 51 0 43 -28 67 -94 78 -74 14 -112 36 -153 89 -79 104 -42 256 77 319 71
+                        38 180 26 247 -27 82 -64 170 39 93 110 -28 27 -109 70 -130 70 -23 0 -2 106
+                        37 186 33 68 126 157 197 190 207 95 453 7 555 -198 l32 -63 -52 -23 c-73 -32
+                        -135 -79 -149 -112 -25 -59 43 -122 96 -89 93 58 118 70 168 80 192 35 366
+                        -125 354 -326 -6 -86 -29 -135 -104 -216 -30 -32 -54 -67 -54 -77 0 -10 18
+                        -42 40 -72 114 -153 112 -348 -6 -478 -24 -28 -65 -64 -92 -80 -99 -64 -53
+                        -62 -1284 -62 -1105 0 -1118 0 -1138 -20 -24 -24 -26 -67 -4 -98 l15 -22 1148
+                        0 c1026 0 1153 2 1202 16 232 69 389 272 389 502 0 90 -22 180 -60 249 l-29
+                        51 44 67 c96 143 108 307 34 463 -57 118 -180 215 -316 245 l-56 13 -22 61
+                        c-63 176 -234 325 -413 362 -72 15 -195 13 -262 -5z"/>
+                        <path d="M3681 1994 c-37 -16 -50 -56 -30 -93 14 -25 32 -34 93 -46 16 -3 44
+                        -21 63 -40 29 -29 33 -39 33 -84 0 -44 -5 -56 -34 -89 l-34 -37 -432 -5 -432
+                        -5 -19 -24 c-24 -30 -24 -62 0 -92 l19 -24 434 0 433 0 53 24 c208 94 214 392
+                        10 497 -47 24 -122 33 -157 18z"/>
+                        <path d="M1759 1212 c-28 -23 -30 -73 -4 -102 26 -29 126 -29 155 0 26 26 25
+                        60 -1 94 -17 22 -28 26 -74 26 -36 0 -60 -6 -76 -18z"/>
+                        </g>
+                        </svg>
+
+                    </button>
+                </div>
+                <div class="mbp-toggle-wrapper">
+                    <label for="hideMaskCheckbox" class="mbp-label">Hide Mask</label>
+                    <label class="mbp-toggle" for="hideMaskCheckbox">
+                        <input type="checkbox" id="hideMaskCheckbox">
+                        <span class="mbp-toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="mbp-toggle-wrapper" style="display: none;">
+                    <label for="hideAllMasksCheckbox" class="mbp-label">Hide All Masks</label>
+                    <label class="mbp-toggle" for="hideAllMasksCheckbox">
+                        <input type="checkbox" id="hideAllMasksCheckbox">
+                        <span class="mbp-toggle-slider"></span>
+                    </label>
+                </div>
+                <select id="saveOptionsSelect" class="mbp-select" style="display: none;">
                 </select>
-                
-                <button id="saveMaskBtn" class="mbp-button" style="width: 100%;" title="Save Mask">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
+                <button id="saveMaskBtn" class="mbp-button" style="width: 100%; display: none;" title="Save Mask">
+                    <!-- SVG icon -->
+                    Save
                 </button>
+                <button id="disableDrawingModeBtn" class="mbp-button" style="width: 100%; display: none;" title="Disable Drawing Mode">
             </div>
         `;
+
 
         while (temp.firstChild) {
             this.uiContainer.appendChild(temp.firstChild);
@@ -118,85 +219,112 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.moveMaskUpBtn = this.uiContainer.querySelector('#moveMaskUpBtn');
         this.moveMaskDownBtn = this.uiContainer.querySelector('#moveMaskDownBtn');
         this.removeMaskBtn = this.uiContainer.querySelector('#removeMaskBtn');
+        this.clearMaskBtn = this.uiContainer.querySelector('#clearMaskBtn');
+        this.clearAllMasksBtn = this.uiContainer.querySelector('#clearAllMasksBtn');
+        this.hideMaskCheckbox = this.uiContainer.querySelector('#hideMaskCheckbox');
+        this.hideAllMasksCheckbox = this.uiContainer.querySelector('#hideAllMasksCheckbox');
         this.saveOptionsSelect = this.uiContainer.querySelector('#saveOptionsSelect');
         this.saveMaskBtn = this.uiContainer.querySelector('#saveMaskBtn');
-
+        this.disableDrawingModeBtn = this.uiContainer.querySelector('#disableDrawingModeBtn');
+        
         this.saveOptions = [
+            {
+                value: 'saveCroppedMask',
+                text: 'Cropped Mask',
+                handler: () => this.maskExportUtilities.saveCroppedMask(),
+                exportFunction: () => this.maskExportUtilities.exportCroppedMask(),
+                show: true,
+            },  
+            {
+                value: 'saveCroppedAlphaOnImage',
+                text: 'Cropped Alpha',
+                handler: () => this.maskExportUtilities.saveCroppedAlphaOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportCroppedAlphaOnImage(),
+                show: true,
+            },  
+            {
+                value: 'saveCroppedImage',
+                text: 'Cropped Image',
+                handler: () => this.maskExportUtilities.saveCroppedImage(),
+                exportFunction: () => this.maskExportUtilities.exportCroppedImage(),
+                show: true,
+            },   
+          
             {
                 value: 'saveMaskAlphaOnImage',
                 text: 'Mask As Alpha on Image',
-                handler: () => this.saveMaskAlphaOnImage(),
-                exportFunction: () => this.exportMaskAlphaOnImage(),
+                handler: () => this.maskExportUtilities.saveMaskAlphaOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportMaskAlphaOnImage(),
                 show: true,
             },
             {
                 value: 'saveAllMasksAlphaOnImage',
                 text: 'All Masks As Alpha on Image',
-                handler: () => this.saveAllMasksAlphaOnImage(),
-                exportFunction: () => this.exportAllMasksAlphaOnImage(),
+                handler: () => this.maskExportUtilities.saveAllMasksAlphaOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasksAlphaOnImage(),
                 show: true,
             },
             {
                 value: 'saveAllMasksCombinedAlphaOnImage',
                 text: 'All Masks As Alpha Combined on Image',
-                handler: () => this.saveAllMasksCombinedAlphaOnImage(),
-                exportFunction: () => this.exportAllMasksCombinedAlphaOnImage(),
+                handler: () => this.maskExportUtilities.saveAllMasksCombinedAlphaOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasksCombinedAlphaOnImage(),
                 show: true,
             },
             {
                 value: 'saveMask',
                 text: 'Mask',
-                handler: () => this.saveMask(),
-                exportFunction: () => this.exportMask(),
+                handler: () => this.maskExportUtilities.saveMask(),
+                exportFunction: () => this.maskExportUtilities.exportMask(),
                 show: true,
             },
             {
                 value: 'saveAllMasks',
                 text: 'All Masks',
-                handler: () => this.saveAllMasks(),
-                exportFunction: () => this.exportMasksImage(),
+                handler: () => this.maskExportUtilities.saveAllMasks(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasks(),
                 show: true,
             },
             {
                 value: 'saveAllMasksCombined',
                 text: 'All Masks Combined',
-                handler: () => this.saveAllMasksCombined(),
-                exportFunction: () => this.exportAllMasksCombined(),
+                handler: () => this.maskExportUtilities.saveAllMasksCombined(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasksCombined(),
                 show: true,
             },
             {
                 value: 'saveAllMasksCombinedBW',
                 text: 'All Masks Combined (B&W)',
-                handler: () => this.saveAllMasksCombinedBlackWhite(),
-                exportFunction: () => this.exportMasksCombinedBlackWhite(),
+                handler: () => this.maskExportUtilities.saveAllMasksCombinedBlackWhite(),
+                exportFunction: () => this.maskExportUtilities.exportMasksCombinedBlackWhite(),
                 show: true,
             },
             {
                 value: 'saveMaskOnImage',
                 text: 'Mask on Image',
-                handler: () => this.saveMaskOnImage(),
-                exportFunction: () => this.exportMaskOnImage(),
+                handler: () => this.maskExportUtilities.saveMaskOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportMaskOnImage(),
                 show: true,
             },
             {
                 value: 'saveAllMasksOnImage',
                 text: 'All Masks on Image',
-                handler: () => this.saveAllMasksOnImage(),
-                exportFunction: () => this.exportAllMasksOnImage(),
+                handler: () => this.maskExportUtilities.saveAllMasksOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasksOnImage(),
                 show: true,
             },
             {
                 value: 'saveAllMasksCombinedOnImage',
                 text: 'All Masks Combined on Image',
-                handler: () => this.saveAllMasksCombinedOnImage(),
-                exportFunction: () => this.exportAllMasksCombinedOnImage(),
+                handler: () => this.maskExportUtilities.saveAllMasksCombinedOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasksCombinedOnImage(),
                 show: true,
             },
             {
                 value: 'saveAllMasksCombinedBWOnImage',
                 text: 'All Masks Combined (B&W) on Image',
-                handler: () => this.saveAllMasksCombinedBlackWhiteOnImage(),
-                exportFunction: () => this.exportAllMasksCombinedBlackWhiteOnImage(),
+                handler: () => this.maskExportUtilities.saveAllMasksCombinedBlackWhiteOnImage(),
+                exportFunction: () => this.maskExportUtilities.exportAllMasksCombinedBlackWhiteOnImage(),
                 show: true,
             },
         ];
@@ -211,7 +339,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         });
     }
 
-
     attachAdditionalEventListeners() {
         this.addMaskBtn.addEventListener('click', this.onAddMask);
         this.maskList.addEventListener('change', this.onChangeMask);
@@ -220,8 +347,12 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.moveMaskUpBtn.addEventListener('click', this.onMoveMaskUp);
         this.moveMaskDownBtn.addEventListener('click', this.onMoveMaskDown);
         this.removeMaskBtn.addEventListener('click', this.onRemoveMask);
-
+        this.clearMaskBtn.addEventListener('click', this.onClearMask);
+        this.clearAllMasksBtn.addEventListener('click', this.onClearAllMasks);
+        this.hideMaskCheckbox.addEventListener('change', this.onToggleHideMask);
+        this.hideAllMasksCheckbox.addEventListener('change', this.onToggleHideAllMasks);
         this.saveMaskBtn.addEventListener('click', this.onHandleSave);
+        this.disableDrawingModeBtn.addEventListener('click', this.disableDrawingMode);
     }
 
     detachAdditionalEventListeners() {
@@ -232,8 +363,12 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.moveMaskUpBtn.removeEventListener('click', this.onMoveMaskUp);
         this.moveMaskDownBtn.removeEventListener('click', this.onMoveMaskDown);
         this.removeMaskBtn.removeEventListener('click', this.onRemoveMask);
-
+        this.clearMaskBtn.removeEventListener('click', this.onClearMask);
+        this.clearAllMasksBtn.removeEventListener('click', this.onClearAllMasks);
+        this.hideMaskCheckbox.removeEventListener('change', this.onToggleHideMask);
+        this.hideAllMasksCheckbox.removeEventListener('change', this.onToggleHideAllMasks);
         this.saveMaskBtn.removeEventListener('click', this.onHandleSave);
+        this.disableDrawingModeBtn.removeEventListener('click', this.disableDrawingMode);
 
         this.canvasManager.off('image:loaded', this.onImageLoaded);
         this.canvasManager.off('canvas:state:changed', this.onCanvasStateChanged);
@@ -243,13 +378,36 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         window.removeEventListener('resize', this.onWindowResize);
 
         this.canvasManager.off('save:trigger', this.onHandleSaveFromCanvas);
+
+        // Disconnect the ResizeObserver
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
     }
 
     onWindowResize() {
-        if (typeof this.onImageModified === 'function') {
-            this.onImageModified();
-        } else {
-            console.error('onImageModified method is not defined or not bound correctly.');
+        this.onImageModified();
+    }
+
+    handleStateChange(state) {
+        console.log('---Current state---', state.hideMask);
+        console.log('---this.clearMasksOnImageLoaded ---', this.clearMasksOnImageLoaded );
+
+
+        if (this.clearMasksOnImageLoaded == false) {
+            if (state.hideMask) {
+                this.hideMaskCheckbox.checked = true;
+                // this.currentMask.visible  = false
+                // this.currentMask.fabricImage.visible = this.currentMask.visible
+                // this.canvas.renderAll();
+                // console.log('---Current state--- hideMask true', state.hideMask);
+            } else {
+                // console.log('---Current state--- hideMask false', state.hideMask);
+                // this.hideMaskCheckbox.checked = false;
+                // this.canvas.renderAll();
+                // this.onToggleDrawingMode() 
+            }
         }
     }
 
@@ -263,16 +421,73 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
 
         this.imageObject.on('modified', this.onImageModified);
 
-        this.masks.forEach(mask => {
-            this.canvas.remove(mask.fabricImage);
-        });
-        this.masks = [];
-        this.currentMask = null;
-        this.maskList.options.length = 0;
+        if (!this.isSubscribed) {
+            this.unsubscribe = store.subscribe(this.handleStateChange);
+            this.isSubscribed = true;
+        }
+        if (this.clearMasksOnImageLoaded) {
+            this.masks.forEach(mask => {
+                this.canvas.remove(mask.fabricImage);
+            });
+            this.masks = [];
+            this.currentMask = null;
+            this.maskList.options.length = 0;
 
-        this.maskStrokeHistory = {};
+            this.maskStrokeHistory = {};
 
-        this.onAddMask();
+            this.onAddMask();
+        } else {
+            this.masks.forEach(mask => {
+                this.canvas.remove(mask.fabricImage);
+                mask.fabricImage = new fabric.Image(mask.canvasEl, {
+                    left: this.imageObject.left,
+                    top: this.imageObject.top,
+                    originX: this.imageObject.originX,
+                    originY: this.imageObject.originY,
+                    selectable: false,
+                    evented: false,
+                    lockMovementX: true,
+                    lockMovementY: true,
+                    lockRotation: true,
+                    lockScalingX: true,
+                    lockScalingY: true,
+                    hasControls: false,
+                    hasBorders: false,
+                    hoverCursor: 'default',
+                    opacity: this.brushOpacity,
+                    scaleX: this.imageObject.scaleX,
+                    scaleY: this.imageObject.scaleY,
+                    willReadFrequently: true,
+                });
+                this.canvas.add(mask.fabricImage);
+                mask.fabricImage.bringToFront();
+
+                if (this.hideMaskCheckbox.checked) {
+                    this.currentMask.visible  = false
+                    this.currentMask.fabricImage.visible = this.currentMask.visible
+                    this.canvas.renderAll();
+                    // console.log('---Current state--- hideMask true', state.hideMask);
+                    // this.onToggleDrawingMode() 
+
+                }
+                else if (this.hideMaskCheckbox.checked === false) {
+                    // console.log('---Current state--- false', state.hideMask);
+                    // this.hideMaskCheckbox.checked = false;
+                    // this.canvas.renderAll();
+                }                
+            });
+
+            if (this.masks.length > 0) {
+                if (!this.currentMask || !this.masks.includes(this.currentMask)) {
+                    this.currentMask = this.masks[0];
+                }
+                this.maskList.value = this.currentMask.name;
+                this.updateBrushColorAndCursor();
+            } else {
+                this.onAddMask();
+            }
+            this.canvas.renderAll();
+        }
     }
 
     onImageModified() {
@@ -336,10 +551,10 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
             hasControls: false,
             hasBorders: false,
             hoverCursor: 'default',
-            opacity: this.brushOpacity, 
+            opacity: this.brushOpacity,
             scaleX: this.imageObject.scaleX,
             scaleY: this.imageObject.scaleY,
-            willReadFrequently: true, 
+            willReadFrequently: true,
         });
 
         this.canvas.add(maskFabricImage);
@@ -351,6 +566,7 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
             fabricImage: maskFabricImage,
             canvasEl: maskCanvas,
             ctx: maskCtx,
+            visible: true,
         };
 
         this.masks.push(mask);
@@ -367,7 +583,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         option.dataset.color = color;
         this.maskList.add(option);
         this.maskList.value = maskName;
-
         this.updateBrushColorAndCursor();
     }
 
@@ -375,15 +590,46 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         const selectedOption = this.maskList.options[this.maskList.selectedIndex];
         const maskName = selectedOption.value;
         const color = selectedOption.dataset.color;
-    
+
         this.currentMask = this.masks.find(m => m.name === maskName);
         this.brushColor = color;
-    
+
         this.colorPicker.value = color;
-    
+
+        this.hideMaskCheckbox.checked = !this.currentMask.visible;
+
         this.updateBrushColorAndCursor();
     }
+
+    disableDrawingMode() {  
+        super.disableDrawingMode();
+    }
+
+    onPanActivated() {
+        this.disableDrawingMode();
+
+    }
     
+    onPanDeactivated() {
+        // this.disableDrawingMode();
+    }
+
+
+    onToggleDrawingMode() {
+        super.onToggleDrawingMode();
+
+        if (this.drawingMode) {
+            this.canvasManager.emit('mask:activated');
+        }
+
+        // console.log('onToggleDrawingModemask:', store);
+
+        // store.dispatch({
+        //     type: 'TOGGLE_MASK',
+        //     payload: true
+        // });
+    }
+
     onChangeMaskColor() {
         const color = this.brushColor = this.colorPicker.value;
         const selectedOption = this.maskList.options[this.maskList.selectedIndex];
@@ -435,9 +681,9 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         for (let i = 0; i < data.length; i += 4) {
             const alpha = data[i + 3];
             if (alpha > 0) {
-                data[i] = rNew;     // Red
-                data[i + 1] = gNew; // Green
-                data[i + 2] = bNew; // Blue
+                data[i] = rNew;
+                data[i + 1] = gNew;
+                data[i + 2] = bNew;
             }
         }
 
@@ -446,7 +692,7 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
     }
 
     onApplyColorToExistingMaskChange() {
-        //can be used if additional actions are needed when the checkbox state changes
+        // Additional actions if needed when the checkbox state changes
     }
 
     onMoveMaskUp() {
@@ -522,8 +768,12 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
             const newIndex = selectedIndex > 0 ? selectedIndex - 1 : 0;
             this.maskList.selectedIndex = newIndex;
             this.currentMask = this.masks[newIndex];
+
+            this.hideMaskCheckbox.checked = !this.currentMask.visible;
+
         } else {
             this.currentMask = null;
+            this.hideMaskCheckbox.checked = false;
         }
 
         this.updateBrushColorAndCursor();
@@ -531,13 +781,74 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.canvas.renderAll();
     }
 
+    onClearMask() {
+        if (!this.currentMask) {
+            alert('No mask selected to clear.');
+            return;
+        }
+
+        const confirmClear = confirm(`Are you sure you want to clear "${this.currentMask.name}"?`);
+        if (!confirmClear) {
+            return;
+        }
+
+        this.currentMask.ctx.clearRect(0, 0, this.currentMask.canvasEl.width, this.currentMask.canvasEl.height);
+        this.currentMask.fabricImage.dirty = true;
+        this.canvas.renderAll();
+
+        this.maskStrokeHistory[this.currentMask.name] = {
+            undoStack: [],
+            redoStack: []
+        };
+    }
+
+    onClearAllMasks() {
+        // const confirmClearAll = confirm('Are you sure you want to clear all masks?');
+        // if (!confirmClearAll) {
+        //     return;
+        // }
+
+        this.masks.forEach(mask => {
+            mask.ctx.clearRect(0, 0, mask.canvasEl.width, mask.canvasEl.height);
+            mask.fabricImage.dirty = true;
+
+            this.maskStrokeHistory[mask.name] = {
+                undoStack: [],
+                redoStack: []
+            };
+        });
+        this.canvas.renderAll();
+    }
+
+    onToggleHideMask() {
+        if (!this.currentMask) {
+            this.hideMaskCheckbox.checked = false;
+            return;
+        }
+
+        this.currentMask.visible = !this.hideMaskCheckbox.checked;
+        this.currentMask.fabricImage.visible = this.currentMask.visible;
+        this.canvas.renderAll();
+    }
+
+    onToggleHideAllMasks() {
+        const hideAll = this.hideAllMasksCheckbox.checked;
+        this.masks.forEach(mask => {
+            mask.visible = !hideAll;
+            mask.fabricImage.visible = mask.visible;
+        });
+        if (this.currentMask) {
+            this.hideMaskCheckbox.checked = !this.currentMask.visible;
+        }
+        this.canvas.renderAll();
+    }
+
     updateBrushColorAndCursor() {
         if (this.currentMask) {
-            this.brushColor = this.currentMask.color; 
-            this.updateCursorCircle(); 
-            this.canvas.requestRenderAll(); 
+            this.brushColor = this.currentMask.color;
+            this.updateCursorCircle();
+            this.canvas.requestRenderAll();
         } else {
-
             this.brushColor = '#FF0000';
             this.updateCursorCircle();
             this.canvas.requestRenderAll();
@@ -606,14 +917,12 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
     }
 
     onUndoMaskStroke(strokeData) {
-        console.log('MaskBrushPlugin: Undoing mask stroke', strokeData);
         if (strokeData.type === 'add') {
             this.undoLastStroke(strokeData.maskName);
         }
     }
 
     onRedoMaskStroke(strokeData) {
-        console.log('MaskBrushPlugin: Redoing mask stroke', strokeData);
         if (strokeData.type === 'add') {
             this.redoLastStroke(strokeData.maskName, strokeData);
         }
@@ -685,7 +994,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
             console.error('Image object is not defined.');
             return;
         }
-
         this.currentMask.ctx.globalAlpha = 1;
 
         const adjustedBrushSize = this.brushSize / (this.currentZoom * this.imageObject.scaleX);
@@ -760,496 +1068,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         return this.saveOptions.find(opt => opt.value === optionValue)?.exportFunction || null;
     }
 
-    createCombinedAlphaMask() {
-        const alphaCanvas = document.createElement('canvas');
-        alphaCanvas.width = this.imageOriginalWidth;
-        alphaCanvas.height = this.imageOriginalHeight;
-        const alphaCtx = alphaCanvas.getContext('2d');
-
-        alphaCtx.clearRect(0, 0, alphaCanvas.width, alphaCanvas.height);
-        this.masks.forEach(mask => {
-            alphaCtx.drawImage(mask.canvasEl, 0, 0, alphaCanvas.width, alphaCanvas.height);
-        });
-
-        return alphaCanvas;
-    }
-
-    exportMaskAlphaOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to save the alpha on.');
-            return null;
-        }
-
-        if (!this.currentMask) {
-            alert('No mask selected to save as alpha.');
-            return null;
-        }
-
-        try {
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = this.imageOriginalWidth;
-            combinedCanvas.height = this.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
-
-            combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            const alphaMask = document.createElement('canvas');
-            alphaMask.width = this.imageOriginalWidth;
-            alphaMask.height = this.imageOriginalHeight;
-            const alphaCtx = alphaMask.getContext('2d');
-            alphaCtx.drawImage(this.currentMask.canvasEl, 0, 0, alphaMask.width, alphaMask.height);
-
-            combinedCtx.globalCompositeOperation = 'destination-out';
-            combinedCtx.drawImage(alphaMask, 0, 0, combinedCanvas.width, combinedCanvas.height);
-            combinedCtx.globalCompositeOperation = 'source-over';
-
-            const combinedDataURL = combinedCanvas.toDataURL('image/png');
-            return combinedDataURL;
-
-        } catch (error) {
-            console.error('Error saving single mask alpha on image:', error);
-            alert('An error occurred while saving the single mask alpha on image.');
-            return null;
-        }
-    }
-
-    exportAllMasksAlphaOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to save the alphas on.');
-            return null;
-        }
-
-        if (this.masks.length === 0) {
-            alert('No masks available to save as alphas.');
-            return null;
-        }
-
-        try {
-            const dataURLs = this.masks.map(mask => {
-                const combinedCanvas = document.createElement('canvas');
-                combinedCanvas.width = this.imageOriginalWidth;
-                combinedCanvas.height = this.imageOriginalHeight;
-                const combinedCtx = combinedCanvas.getContext('2d');
-
-                combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-                const alphaMask = document.createElement('canvas');
-                alphaMask.width = this.imageOriginalWidth;
-                alphaMask.height = this.imageOriginalHeight;
-                const alphaCtx = alphaMask.getContext('2d');
-                alphaCtx.drawImage(mask.canvasEl, 0, 0, alphaMask.width, alphaMask.height);
-
-                combinedCtx.globalCompositeOperation = 'destination-out';
-                combinedCtx.drawImage(alphaMask, 0, 0, combinedCanvas.width, combinedCanvas.height);
-                combinedCtx.globalCompositeOperation = 'source-over';
-
-                return {
-                    dataURL: combinedCanvas.toDataURL('image/png'),
-                    filename: `${mask.name}_alpha_on_image.png`
-                };
-            });
-
-            return dataURLs;
-
-        } catch (error) {
-            console.error('Error saving all masks alphas on image:', error);
-            alert('An error occurred while saving all masks alphas on image.');
-            return null;
-        }
-    }
-
-    exportAllMasksCombinedAlphaOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to save the combined alpha on.');
-            return null;
-        }
-
-        if (this.masks.length === 0) {
-            alert('No masks available to save as combined alpha.');
-            return null;
-        }
-
-        try {
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = this.imageOriginalWidth;
-            combinedCanvas.height = this.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
-
-            combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            const alphaMask = this.createCombinedAlphaMask();
-
-            combinedCtx.globalCompositeOperation = 'destination-out';
-            combinedCtx.drawImage(alphaMask, 0, 0, combinedCanvas.width, combinedCanvas.height);
-            combinedCtx.globalCompositeOperation = 'source-over'; 
-
-            const combinedDataURL = combinedCanvas.toDataURL('image/png');
-            return combinedDataURL;
-
-        } catch (error) {
-            console.error('Error saving combined masks alpha on image:', error);
-            alert('An error occurred while saving the combined masks alpha on image.');
-            return null;
-        }
-    }
-
-    //Mask
-    exportMask() {
-        if (!this.currentMask) {
-            alert('No mask selected to export.');
-            return null;
-        }
-
-        try {
-            const dataURL = this.currentMask.canvasEl.toDataURL('image/png');
-            return dataURL;
-        } catch (error) {
-            console.error('Error exporting single mask image:', error);
-            alert('An error occurred while exporting the single mask image.');
-            return null;
-        }
-    }
-
-    exportAllMasks() {
-        if (!this.imageObject) {
-            alert('No image loaded to export masks on.');
-            return null;
-        }
-
-        if (this.masks.length === 0) {
-            alert('No masks available to export on image.');
-            return null;
-        }
-
-        const combinedCanvas = document.createElement('canvas');
-        combinedCanvas.width = this.imageOriginalWidth;
-        combinedCanvas.height = this.imageOriginalHeight;
-        const combinedCtx = combinedCanvas.getContext('2d');
-
-        combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-        this.masks.forEach(mask => {
-            combinedCtx.drawImage(mask.canvasEl, 0, 0, combinedCanvas.width, combinedCanvas.height);
-        });
-
-        const combinedDataURL = combinedCanvas.toDataURL('image/png');
-        return combinedDataURL;
-    }
-
-    exportAllMasksCombined() {
-        if (this.masks.length === 0) {
-            alert('No masks available to export.');
-            return null;
-        }
-
-        try {
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = this.imageOriginalWidth;
-            combinedCanvas.height = this.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
-            this.masks.forEach(mask => {
-                combinedCtx.drawImage(mask.canvasEl, 0, 0, combinedCanvas.width, combinedCanvas.height);
-            });
-
-            const combinedDataURL = combinedCanvas.toDataURL('image/png');
-            return combinedDataURL;
-        } catch (error) {
-            console.error('Error exporting combined masks image:', error);
-            alert('An error occurred while exporting the combined masks image.');
-            return null;
-        }
-    }
-
-    exportMasksCombinedBlackWhite() {
-        if (this.masks.length === 0) {
-            alert('No masks available to export.');
-            return null;
-        }
-
-        const combinedCanvas = document.createElement('canvas');
-        combinedCanvas.width = this.imageOriginalWidth;
-        combinedCanvas.height = this.imageOriginalHeight;
-        const combinedCtx = combinedCanvas.getContext('2d');
-
-        combinedCtx.fillStyle = 'black';
-        combinedCtx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-
-        this.masks.forEach(mask => {
-            const maskCanvas = document.createElement('canvas');
-            maskCanvas.width = this.imageOriginalWidth;
-            maskCanvas.height = this.imageOriginalHeight;
-            const maskCtx = maskCanvas.getContext('2d');
-
-            maskCtx.drawImage(mask.canvasEl, 0, 0, maskCanvas.width, maskCanvas.height);
-
-            const imageData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
-            const data = imageData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                const alpha = data[i + 3];
-                if (alpha > 0) {
-                    data[i] = 255;    
-                    data[i + 1] = 255; 
-                    data[i + 2] = 255;
-                }
-            }
-
-            maskCtx.putImageData(imageData, 0, 0);
-
-            combinedCtx.drawImage(maskCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height);
-        });
-
-        const combinedDataURL = combinedCanvas.toDataURL('image/png');
-        return combinedDataURL;
-    }
-
-    //Mask on image
-    exportMaskOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to export mask on.');
-            return null;
-        }
-
-        if (!this.currentMask) {
-            alert('No mask selected to export on image.');
-            return null;
-        }
-
-        try {
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = this.imageOriginalWidth;
-            combinedCanvas.height = this.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
-
-            combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            combinedCtx.drawImage(this.currentMask.canvasEl, 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            const combinedDataURL = combinedCanvas.toDataURL('image/png');
-            return combinedDataURL;
-        } catch (error) {
-            console.error('Error exporting single mask on image:', error);
-            alert('An error occurred while exporting the single mask on image.');
-            return null;
-        }
-    }
-
-    exportAllMasksOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to export masks on.');
-            return null;
-        }
-
-        if (this.masks.length === 0) {
-            alert('No masks available to export on image.');
-            return null;
-        }
-
-        try {
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = this.imageOriginalWidth;
-            combinedCanvas.height = this.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
-
-            combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            this.masks.forEach(mask => {
-                combinedCtx.drawImage(mask.canvasEl, 0, 0, combinedCanvas.width, combinedCanvas.height);
-            });
-
-            const combinedDataURL = combinedCanvas.toDataURL('image/png');
-            return combinedDataURL;
-        } catch (error) {
-            console.error('Error exporting all masks on image:', error);
-            alert('An error occurred while exporting all masks on image.');
-            return null;
-        }
-    }
-
-    exportAllMasksCombinedOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to export combined masks on.');
-            return null;
-        }
-
-        if (this.masks.length === 0) {
-            alert('No masks available to export combined on image.');
-            return null;
-        }
-
-        try {
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = this.imageOriginalWidth;
-            combinedCanvas.height = this.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
-
-            combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            const combinedMaskCanvas = this.createCombinedAlphaMask();
-            combinedCtx.drawImage(combinedMaskCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-            const combinedDataURL = combinedCanvas.toDataURL('image/png');
-            return combinedDataURL;
-        } catch (error) {
-            console.error('Error exporting combined masks on image:', error);
-            alert('An error occurred while exporting combined masks on image.');
-            return null;
-        }
-    }
-
-    exportAllMasksCombinedBlackWhiteOnImage() {
-        if (!this.imageObject) {
-            alert('No image loaded to export masks on.');
-            return null;
-        }
-
-        if (this.masks.length === 0) {
-            alert('No masks available to export on image.');
-            return null;
-        }
-
-        const combinedCanvas = document.createElement('canvas');
-        combinedCanvas.width = this.imageOriginalWidth;
-        combinedCanvas.height = this.imageOriginalHeight;
-        const combinedCtx = combinedCanvas.getContext('2d');
-
-        combinedCtx.drawImage(this.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-        const tempMasksCanvas = document.createElement('canvas');
-        tempMasksCanvas.width = this.imageOriginalWidth;
-        tempMasksCanvas.height = this.imageOriginalHeight;
-        const tempMasksCtx = tempMasksCanvas.getContext('2d');
-
-        tempMasksCtx.fillStyle = 'black';
-        tempMasksCtx.fillRect(0, 0, tempMasksCanvas.width, tempMasksCanvas.height);
-
-        this.masks.forEach(mask => {
-            const maskCanvas = document.createElement('canvas');
-            maskCanvas.width = this.imageOriginalWidth;
-            maskCanvas.height = this.imageOriginalHeight;
-            const maskCtx = maskCanvas.getContext('2d');
-
-            maskCtx.drawImage(mask.canvasEl, 0, 0, maskCanvas.width, maskCanvas.height);
-
-            const imageData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
-            const data = imageData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                const alpha = data[i + 3];
-                if (alpha > 0) {
-                    data[i] = 255;     
-                    data[i + 1] = 255;
-                    data[i + 2] = 255;
-                }
-            }
-
-            maskCtx.putImageData(imageData, 0, 0);
-
-            tempMasksCtx.drawImage(maskCanvas, 0, 0, tempMasksCanvas.width, tempMasksCanvas.height);
-        });
-
-        combinedCtx.drawImage(tempMasksCanvas, 0, 0, combinedCanvas.width, combinedCanvas.height);
-
-        const combinedDataURL = combinedCanvas.toDataURL('image/png');
-        return combinedDataURL;
-    }
-
-    saveMaskAlphaOnImage() {
-        const dataURL = this.exportMaskAlphaOnImage();
-        if (dataURL) {
-            this.downloadImage(dataURL, `${this.currentMask.name}_alpha_on_image.png`);
-        }
-    }
-
-    saveAllMasksAlphaOnImage() {
-        const dataURLs = this.exportAllMasksAlphaOnImage();
-        if (dataURLs) {
-            dataURLs.forEach(({ dataURL, filename }) => {
-                this.downloadImage(dataURL, filename);
-            });
-        }
-    }
-
-    saveAllMasksCombinedAlphaOnImage() {
-        const dataURL = this.exportAllMasksCombinedAlphaOnImage();
-        if (dataURL) {
-            this.downloadImage(dataURL, 'combined_masks_alpha_on_image.png');
-        }
-    }
-
-    saveMask() {
-        if (this.currentMask && this.currentMask.canvasEl) {
-            const dataURL = this.exportMask();
-            if (dataURL) {
-                this.downloadImage(dataURL, `${this.currentMask.name}.png`);
-            }
-        } else {
-            alert('No current mask data available to save.');
-        }
-    }
-
-    saveAllMasks() {
-        if (this.masks.length > 0) {
-            this.masks.forEach((mask) => {
-                const dataURL = mask.canvasEl.toDataURL('image/png');
-                this.downloadImage(dataURL, `${mask.name}.png`);
-            });
-        } else {
-            alert('No mask data available to save.');
-        }
-    }
-
-    saveAllMasksCombined() {
-        const combinedDataURL = this.exportAllMasksCombined();
-        if (combinedDataURL) {
-            this.downloadImage(combinedDataURL, 'combined_masks.png');
-        }
-    }
-
-    saveAllMasksCombinedBlackWhite() {
-        const combinedDataURL = this.exportMasksCombinedBlackWhite();
-        if (combinedDataURL) {
-            this.downloadImage(combinedDataURL, 'combined_masks_black_white.png');
-        }
-    }
-
-    saveMaskOnImage() {
-        const dataURL = this.exportMaskOnImage();
-        if (dataURL) {
-            this.downloadImage(dataURL, `${this.currentMask.name}_on_image.png`);
-        }
-    }
-
-    saveAllMasksOnImage() {
-        const dataURL = this.exportAllMasksOnImage();
-        if (dataURL) {
-            this.downloadImage(dataURL, 'all_masks_on_image.png');
-        }
-    }
-
-    saveAllMasksCombinedOnImage() {
-        const dataURL = this.exportAllMasksCombinedOnImage();
-        if (dataURL) {
-            this.downloadImage(dataURL, 'combined_masks_on_image.png');
-        }
-    }
-
-    saveAllMasksCombinedBlackWhiteOnImage() {
-        const combinedDataURL = this.exportAllMasksCombinedBlackWhiteOnImage();
-        if (combinedDataURL) {
-            this.downloadImage(combinedDataURL, 'combined_masks_black_white_on_image.png');
-        }
-    }
-
-    downloadImage(dataUrl, filename) {
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
     destroy() {
         this.detachAdditionalEventListeners();
 
@@ -1265,7 +1083,13 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
 
         this.canvasManager.off('undo:mask:stroke', this.onUndoMaskStroke);
         this.canvasManager.off('redo:mask:stroke', this.onRedoMaskStroke);
+        this.canvasManager.off('pan:activated', this.onPanActivated);
+        this.canvasManager.off('pan:deactivated', this.onPanDeactivated);
 
+        if (this.unsubscribe) {
+            this.unsubscribe();
+            this.isSubscribed = false;
+        }
         super.destroy();
     }
 }

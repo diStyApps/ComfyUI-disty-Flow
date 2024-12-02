@@ -38,7 +38,7 @@ NODE_CLASS_MAPPINGS: Dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: Dict[str, str] = {}
 APP_CONFIGS: List[AppConfig] = []
 APP_NAME: str = "Flow"
-APP_VERSION: str = "0.3.3"
+APP_VERSION: str = "0.4.0"
 PURPLE = "\033[38;5;129m"
 RESET = "\033[0m"
 FLOWMSG = f"{PURPLE}Flow{RESET}"
@@ -743,7 +743,8 @@ def download_or_update_flows() -> None:
         "afl_mochi2v",
         "afl_pulid_flux",
         "afl_pulid_flux_GGUF",
-        "afl_reactor",
+        "afl_reactor"
+        "5otvy-cogvideox-orbit-left-lora",
     ]
 
     try:

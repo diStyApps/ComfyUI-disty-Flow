@@ -29,6 +29,8 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.onImageRemove = this.onImageRemove.bind(this);
         this.onLoadButtonClick = this.onLoadButtonClick.bind(this);
         this.onFileInputChange = this.onFileInputChange.bind(this);
+
+        this.handlePreviewImageLoaded = this.handlePreviewImageLoaded.bind(this);
     }
 
     init(canvasManager) {
@@ -41,7 +43,11 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
         this.canvasManager.on('canvas:resized', this.onCanvasResized);
 
-        this.canvasManager.on('image:remove', this.onImageRemove);
+        this.canvasManager.on('image:remove', this.onImageRemove); 
+        
+        window.addEventListener('previewImageLoaded', this.handlePreviewImageLoaded);
+
+
     }
 
     createUI() {
@@ -152,7 +158,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
     }
 
     onToggleMode() {
-        // Toggle between 'Single' and 'Multi' modes
         this.options.mode = this.options.mode === 'Single' ? 'Multi' : 'Single';
         this.toggleButton.setAttribute('data-mode', this.options.mode);
         this.toggleButton.innerHTML = `
@@ -211,7 +216,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
     }
 
     onCanvasResized({ width, height }) {
-        // Recalculate and apply scale to all images based on original dimensions
         this.loadedImages.forEach(({ imageObject, borderRect }) => {
             const img = imageObject;
             const border = borderRect;
@@ -230,7 +234,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
                 scaleFactor = desiredHeight / img.height;
             }
 
-            // Apply uniform scale to maintain aspect ratio
             img.set({
                 scaleX: scaleFactor,
                 scaleY: scaleFactor,
@@ -434,7 +437,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
             delete this.originalImages[id];
 
-            console.log(`ImageLoaderPlugin: Removed image with ID=${id}`);
+            // console.log(`ImageLoaderPlugin: Removed image with ID=${id}`);
             this.canvasManager.emit('image:removed', { id });
 
             this.canvasManager.emit('image:list:updated', {
@@ -449,7 +452,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
             if (this.options.mode === 'Single' && this.loadedImages.length === 0) {
                 this.canvas.clear();
-                console.log('ImageLoaderPlugin: Canvas cleared in Single mode');
+                // console.log('ImageLoaderPlugin: Canvas cleared in Single mode');
             }
 
             this.canvas.requestRenderAll();
@@ -459,8 +462,30 @@ export class ImageLoaderPlugin extends CanvasPlugin {
     }
 
     onImageRemove({ id }) {
-        console.log(`ImageLoaderPlugin: Received request to remove image ID=${id}`);
+        // console.log(`ImageLoaderPlugin: Received request to remove image ID=${id}`);
         this.removeImageById(id);
+    }
+
+    handlePreviewImageLoaded(event) {
+        const combinedDataURL = event.detail;
+        if (combinedDataURL) {
+            this.loadImageFromDataURL(combinedDataURL);
+            // console.log('ImageLoaderPlugin: Received and loading preview image.');
+        } else {
+            console.error('ImageLoaderPlugin: No image data received in previewImageLoaded event.');
+        }
+    }
+
+    loadImageFromDataURL(dataURL) {
+        fetch(dataURL)
+            .then(response => response.blob())
+            .then(blob => {
+                const file = new File([blob], 'preview.png', { type: 'image/png' });
+                this.handleImageFile(file);
+            })
+            .catch(error => {
+                console.error('ImageLoaderPlugin: Failed to convert Data URL to File.', error);
+            });
     }
 
     destroy() {
@@ -475,5 +500,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.loadedImages = [];
         this.originalImages = {};
         this.canvas.requestRenderAll();
+        window.removeEventListener('previewImageLoaded', this.handlePreviewImageLoaded);
     }
 }

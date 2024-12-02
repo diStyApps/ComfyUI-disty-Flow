@@ -163,7 +163,7 @@ class DimensionSelector {
         const path = this.config.nodePath;
         // const path = config.nodePath
         updateWorkflow(this.workflow, `${path}.${dimension}`, value);
-        console.log(`Workflow updated - ${dimension}: ${value}`);
+        // console.log(`Workflow updated - ${dimension}: ${value}`);
     }
 
     updateWorkflowWithCurrentDimensions() {

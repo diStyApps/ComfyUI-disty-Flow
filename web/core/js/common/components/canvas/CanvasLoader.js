@@ -7,235 +7,67 @@ import { CustomBrushPlugin } from './CustomBrushPlugin.js';
 import { UndoRedoPlugin } from './UndoRedoPlugin.js';
 import { ImageAdderPlugin } from './ImageAdderPlugin.js';
 import { CanvasScaleForSavePlugin } from './CanvasScaleForSavePlugin.js';
+import { store } from '../../scripts/stateManagerMain.js';
 
-const loadFabric = () => {
+const loadScript = (src, name = '') => {
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = '/core/js/common/components/canvas/fabric.5.2.4.min.js';
+        script.src = src;
         script.async = false;
         script.onload = () => {
-            console.log('Fabric.js loaded successfully');
+            // console.log(`${name || src} loaded successfully`);
             resolve();
         };
         script.onerror = () => {
-            console.error('Failed to load Fabric.js');
-            reject(new Error('Fabric.js failed to load'));
+            const error = `Failed to load ${name || src}`;
+            console.error(error);
+            reject(new Error(error));
         };
         document.head.appendChild(script);
     });
 };
 
-// Floating toolbar functionality - move
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-    .plugin-ui-container {
-        position: relative;
-        display: flex;
-        gap: 0.5rem;
-        padding: 0.5rem;
-        padding-right: calc(0.5rem + 36px);
-        transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
-        will-change: transform;
+const loadDependencies = async () => {
+    try {
+        await Promise.all([
+            loadScript('/core/js/common/components/canvas/fabric.5.2.4.min.js', 'Fabric.js'),
+            // loadScript('/core/js/common/components/canvas/pica.min.js', 'Pica.js')
+        ]);
+        // console.log('All dependencies loaded successfully');
+    } catch (error) {
+        console.error('Failed to load dependencies:', error);
+    }
+};
+
+function setView(view) {
+    const canvasWrapper = document.getElementById("canvasWrapper");
+    const imageContainer = document.getElementById("image-container");
+
+    if (!canvasWrapper || !imageContainer) {
+        console.warn("Required elements not found: 'canvasWrapper' or 'image-container'.");
+        return;
     }
 
-    .plugin-ui-container.floating {
-        position: fixed;
-        bottom: 25%;
-       /* left: 16%px; */
-        z-index: 1000;
-        background: var(--color-background);
-        border: 1px dashed var(--color-border);
-        cursor: move;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    switch(view) {
+        case 'output':
+            imageContainer.style.display = "flex"; 
+            canvasWrapper.style.display = "none"; 
+            break;
+        case 'canvas':
+            canvasWrapper.style.display = "flex"; 
+            imageContainer.style.display = "none";
+            break;
+        case 'splitView':
+            canvasWrapper.style.display = "flex";
+            imageContainer.style.display = "flex";
+            break;
+        default:
+            console.warn(`Unknown view state: ${view}. Defaulting to 'splitView'.`);
+            canvasWrapper.style.display = "flex";
+            imageContainer.style.display = "flex";
     }
-
-    .dock-toggle {
-        position: absolute;
-        right: 0;
-        top: 0;
-        height: 100%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.5rem;
-        background: var(--color-button-primary);
-        border: none;
-        border-left: 1px dashed var(--color-border);
-        cursor: pointer;
-        transition: all 0.2s;
-        color: var(--color-primary-text);
-        width: 36px;
-    }
-
-    .plugin-ui-container.floating .dock-toggle {
-        position: relative;
-        height: 36px;
-        margin-left: 0.5rem;
-        border: none;
-    }
-
-    .dock-toggle:hover {
-        background: var(--color-button-primary-hover);
-    }
-
-    .dock-toggle svg {
-        width: 1.25rem;
-        height: 1.25rem;
-        transition: transform 0.2s ease;
-    }
-
-    .dock-toggle:hover svg {
-        transform: scale(1.1);
-    }
-
-    .plugin-ui-container.floating .dock-toggle:hover svg {
-        transform: scale(1.1);
-    }
-`;
-document.head.appendChild(styleSheet);
-
-function initializeFloating() {
-    const container = document.getElementById('pluginUIContainer');
-    const dockButton = document.createElement('button');
-    dockButton.className = 'dock-toggle';
-    dockButton.title = 'Make toolbar floating';
-    dockButton.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
-                  d="M15 9l-3-3m0 0L9 9m3-3v15m0-15h6m-6 0H6"/>
-        </svg>
-    `;
-    container.appendChild(dockButton);
-
-    let isDragging = false;
-    let currentX;
-    let currentY;
-    let initialX;
-    let initialY;
-    let xOffset = 0;
-    let yOffset = 0;
-    let originalPosition = null;
-    let lastFrameTime = 0;
-    const frameRate = 1000 / 120;
-
-    function updateDockIcon(isFloating) {
-        dockButton.title = isFloating ? 'Dock toolbar' : 'Make toolbar floating';
-        dockButton.innerHTML = isFloating 
-            ? `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
-                         d="M9 15l3 3m0 0l3-3m-3 3V6m0 12h6m-6 0H6"/>
-               </svg>`
-            : `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
-                         d="M15 9l-3-3m0 0L9 9m3-3v15m0-15h6m-6 0H6"/>
-               </svg>`;
-    }
-
-    function updateDockButtonPosition(isFloating) {
-        if (isFloating) {
-            container.appendChild(dockButton);
-        } else {
-            container.insertBefore(dockButton, container.firstChild);
-        }
-    }
-
-    function startDragging(e) {
-        if (container.classList.contains('floating') && e.target !== dockButton) {
-            isDragging = true;
-            initialX = e.clientX - xOffset;
-            initialY = e.clientY - yOffset;
-            container.style.transition = 'none';
-            document.body.style.cursor = 'move';
-        }
-    }
-
-    function drag(e) {
-        if (isDragging) {
-            e.preventDefault();
-            
-            const currentTime = performance.now();
-            if (currentTime - lastFrameTime < frameRate) return;
-            
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-            xOffset = currentX;
-            yOffset = currentY;
-            container.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
-            
-            lastFrameTime = currentTime;
-        }
-    }
-
-    function stopDragging() {
-        if (isDragging) {
-            isDragging = false;
-            container.style.transition = '';
-            document.body.style.cursor = '';
-        }
-    }
-
-    function toggleFloating() {
-        const isFloating = container.classList.toggle('floating');
-        updateDockIcon(isFloating);
-        updateDockButtonPosition(isFloating);
-
-        if (isFloating) {
-            originalPosition = {
-                parent: container.parentNode,
-                nextSibling: container.nextSibling,
-                styles: {
-                    position: container.style.position,
-                    top: container.style.top,
-                    left: container.style.left,
-                    transform: container.style.transform,
-                    zIndex: container.style.zIndex
-                }
-            };
-            
-            container.addEventListener('mousedown', startDragging);
-            window.addEventListener('mousemove', drag);
-            window.addEventListener('mouseup', stopDragging);
-            window.addEventListener('mouseleave', stopDragging);
-            
-            container.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
-        } else {
-            container.removeEventListener('mousedown', startDragging);
-            window.removeEventListener('mousemove', drag);
-            window.removeEventListener('mouseup', stopDragging);
-            window.removeEventListener('mouseleave', stopDragging);
-            
-            container.style.transform = '';
-            container.style.position = '';
-            container.style.top = '';
-            container.style.left = '';
-            container.style.zIndex = '';
-            xOffset = 0;
-            yOffset = 0;
-        }
-    }
-
-    dockButton.addEventListener('click', toggleFloating);
-
-    container.addEventListener('selectstart', (e) => {
-        if (isDragging) e.preventDefault();
-    });
-
-    return function cleanup() {
-        container.removeEventListener('mousedown', startDragging);
-        window.removeEventListener('mousemove', drag);
-        window.removeEventListener('mouseup', stopDragging);
-        window.removeEventListener('mouseleave', stopDragging);
-        dockButton.removeEventListener('click', toggleFloating);
-        container.removeEventListener('selectstart', (e) => {
-            if (isDragging) e.preventDefault();
-        });
-        if (dockButton.parentNode) {
-            dockButton.parentNode.removeChild(dockButton);
-        }
-    };
 }
-const cleanupFloating = initializeFloating();
-// Floating toolbar functionality
+
 
 export class CanvasLoader {
     constructor(canvasId, flowConfig) {
@@ -243,6 +75,12 @@ export class CanvasLoader {
         this.flowConfig = flowConfig;
         this.isInitialized = false;
         this.initPromise = this.init();
+
+        store.subscribe((state) => {
+            setView(state.view);
+        });
+
+        setView(this.flowConfig.initialView || store.getState().view);
     }
 
     determineCanvasOptions(flowConfig) {
@@ -259,9 +97,17 @@ export class CanvasLoader {
 
         // **Case 1**: Load maskBrush if canvasLoadedImages and canvasSelectedMaskOutputs are present
         if (flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0 &&
-            flowConfig.canvasSelectedMaskOutputs && Array.isArray(flowConfig.canvasSelectedMaskOutputs) && flowConfig.canvasSelectedMaskOutputs.length > 0) {
+            flowConfig.canvasAlphaOutputs && Array.isArray(flowConfig.canvasAlphaOutputs) && flowConfig.canvasAlphaOutputs.length > 0) {
             options.maskBrush = true;
             options.imageLoader = true;
+            store.dispatch({
+                type: 'SET_VIEW',
+                payload: 'canvas'
+            });
+            store.dispatch({
+                type: 'SET_INPAINT_STYLE',
+                payload: 'full'
+            });
         }
 
         // **Case 2**: Load customBrush if canvasOutputs are present
@@ -269,10 +115,54 @@ export class CanvasLoader {
             options.customBrush = true;
             options.imageLoader = true;
             options.canvasScaleForSave = true;
-
-
+            store.dispatch({
+                type: 'SET_VIEW',
+                payload: 'splitView'
+            });
         }
+        // // **Case 3**: Load canvasCroppedImageOutputs if canvasCroppedMaskOutputs are present
+        // if (flowConfig.canvasCroppedMaskOutputs && Array.isArray(flowConfig.canvasCroppedMaskOutputs) && flowConfig.canvasCroppedMaskOutputs.length > 0) {
+        //     options.maskBrush = true;
+        //     options.imageLoader = true;
+        //     store.dispatch({
+        //         type: 'SET_VIEW',
+        //         payload: 'canvas'
+        //     });
+        // }
 
+        //MASK
+        // **Case 4**: Load canvasCroppedImageOutputs and canvasCroppedMaskOutputs and canvasLoadedImages are present
+        if (flowConfig.canvasCroppedImageOutputs && Array.isArray(flowConfig.canvasCroppedImageOutputs) && flowConfig.canvasCroppedImageOutputs.length > 0 &&
+            flowConfig.canvasCroppedMaskOutputs && Array.isArray(flowConfig.canvasCroppedMaskOutputs) && flowConfig.canvasCroppedMaskOutputs.length > 0 &&
+            flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0) {
+                options.maskBrush = true;
+                options.imageLoader = true;
+                store.dispatch({
+                    type: 'SET_VIEW',
+                    payload: 'canvas'
+                });
+                store.dispatch({
+                    type: 'SET_INPAINT_STYLE',
+                    payload: 'cropped'
+                });
+                
+        }
+        //ALPHA MASK
+        // **Case 5**: Load canvasCroppedImageOutputs and canvasCroppedAlphaOnImageOutputs and canvasLoadedImages are present
+        if (flowConfig.canvasCroppedImageOutputs && Array.isArray(flowConfig.canvasCroppedImageOutputs) && flowConfig.canvasCroppedImageOutputs.length > 0 &&
+            flowConfig.canvasCroppedAlphaOnImageOutputs && Array.isArray(flowConfig.canvasCroppedAlphaOnImageOutputs) && flowConfig.canvasCroppedAlphaOnImageOutputs.length > 0 &&
+            flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0) {
+                options.maskBrush = true;
+                options.imageLoader = true;
+                store.dispatch({
+                    type: 'SET_VIEW',
+                    payload: 'canvas'
+                });
+                store.dispatch({
+                    type: 'SET_INPAINT_STYLE',
+                    payload: 'cropped'
+                });
+        }
         return options;
     }
 
@@ -282,13 +172,14 @@ export class CanvasLoader {
 
 
             if (!this.options.maskBrush && !this.options.customBrush) {
-                console.warn("No relevant fields in flowConfig. Canvas will not be displayed or initialized.");
+                console.log("No relevant fields in flowConfig. Canvas will not be displayed or initialized.");
                 this.hideCanvasUI();
                 return;
             }
 
-            await loadFabric();
-
+            // await loadFabric();
+            // loadScript('/core/js/common/components/canvas/fabric.5.2.4.min.js')
+            await loadDependencies();
             const canvasWrapper = document.getElementById('canvasWrapper');
             const pluginUIContainer = document.getElementById('pluginUIContainer');
 
@@ -297,7 +188,7 @@ export class CanvasLoader {
             }
 
             canvasWrapper.style.display = 'block';
-            pluginUIContainer.style.display = 'block';
+            pluginUIContainer.style.display = 'flex';
 
             this.canvasManager = new CanvasManager({ canvasId: this.canvasId });
 
@@ -431,6 +322,48 @@ export class CanvasLoader {
                 return exportFunction();
             } else {
                 console.error('Failed to get export function for saveMaskAlphaOnImage.');
+                return null;
+            }
+        }
+        return null;
+    }
+
+    getCroppedMask(){
+        const maskBrushPlugin = this.canvasManager.getPluginByName('MaskBrushPlugin');
+        if (maskBrushPlugin) {
+            const exportFunction = maskBrushPlugin.getExportFunction('saveCroppedMask');
+            if (exportFunction) {
+                return exportFunction();
+            } else {
+                console.error('Failed to get export function for saveCroppedMask.');
+                return null;
+            }
+        }
+        return null;
+    }
+
+    getCroppedImage(){
+        const maskBrushPlugin = this.canvasManager.getPluginByName('MaskBrushPlugin');
+        if (maskBrushPlugin) {
+            const exportFunction = maskBrushPlugin.getExportFunction('saveCroppedImage');
+            if (exportFunction) {
+                return exportFunction();
+            } else {
+                console.error('Failed to get export function for saveCroppedImage.');
+                return null;
+            }
+        }
+        return null;
+    }
+
+    getCroppedAlphaOnImage(){
+        const maskBrushPlugin = this.canvasManager.getPluginByName('MaskBrushPlugin');
+        if (maskBrushPlugin) {
+            const exportFunction = maskBrushPlugin.getExportFunction('saveCroppedAlphaOnImage');
+            if (exportFunction) {
+                return exportFunction();
+            } else {
+                console.error('Failed to get export function for saveCroppedAlphaOnImage.');
                 return null;
             }
         }

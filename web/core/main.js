@@ -2,6 +2,7 @@ import StateManager from './js/common/scripts/stateManager.js';
 import MultiComponent from './js/common/components/MultiComponent.js';
 import InputComponent from "./js/common/components/InputComponent.js";
 import ToggleComponent from "./js/common/components/ToggleComponent.js";
+import DataComponent from "./js/common/components/DataComponent.js";
 import Seeder from "./js/common/components/Seeder.js";
 import Stepper from "./js/common/components/Stepper.js";
 import MultiStepper from "./js/common/components/MultiStepper.js";
@@ -17,14 +18,31 @@ import { fetchWorkflow } from './js/common/scripts/fetchWorkflow.js';
 import { fetchflowConfig } from './js/common/scripts/fetchflowConfig.js'; 
 import { setFaviconStatus } from './js/common/scripts/favicon.js'; 
 import { PreferencesManager } from './js/common/scripts/preferences.js';
+import { initialize } from './js/common/scripts/interactiveUI.js';
 import ThemeManager from './js/common/scripts/ThemeManager.js';
 import injectStylesheet from './js/common/scripts/injectStylesheet.js';
 import LoraWorkflowManager from './js/common/components/LoraWorkflowManager.js';
 import { CanvasLoader } from './js/common/components/canvas/CanvasLoader.js';
 import { checkAndShowMissingPackagesDialog } from './js/common/components/missingPackagesDialog.js';
 import CanvasComponent from './js/common/components/CanvasComponent.js';
+import { store } from  './js/common/scripts/stateManagerMain.js';
 
 (async (window, document, undefined) => {
+
+    const defaultPreferences = {
+        selectedCategories: [],
+        favoritesFilterActive: false,
+        hideDescriptions: false,
+        hideTitles: false,
+        sortValue: 'nameAsc',
+        selectedTheme: null 
+    };
+    
+    const preferencesManager = new PreferencesManager(defaultPreferences);
+    ThemeManager.applyInitialTheme(preferencesManager);
+    const themeManager = new ThemeManager(preferencesManager);
+    themeManager.init();
+
 
     function getFlowName() {
         const scripts = document.getElementsByTagName('script');
@@ -44,7 +62,7 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
         }
         const paths = window.location.pathname.split('/').filter(Boolean);
         if (paths[0] === 'flow' && paths[1]) {
-            console.log('Flow name from URL path:', paths[1]);
+            console.log('Flow name:', paths[1]);
             return paths[1];
         }
         console.log('Default flow name: linker');
@@ -66,26 +84,9 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
     console.log("flowConfig", flowConfig);
     console.log("workflow", workflow);
 
-    const defaultPreferences = {
-        selectedCategories: [],
-        favoritesFilterActive: false,
-        hideDescriptions: false,
-        hideTitles: false,
-        sortValue: 'nameAsc',
-        selectedTheme: null 
-    };
-    
-    const preferencesManager = new PreferencesManager(defaultPreferences);
-
-    ThemeManager.applyInitialTheme(preferencesManager);
-    const themeManager = new ThemeManager(preferencesManager);
-    themeManager.init();
 
     function generateWorkflowControls(config) {
         const container = document.getElementById('side-workflow-controls');
-
-        console.log("config", config);
-
         if (config.dropdowns && Array.isArray(config.dropdowns)) {
             config.dropdowns.forEach(dropdown => {
                 const div = document.createElement('div');
@@ -146,7 +147,7 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
         const promptsContainer = document.getElementById('prompts');
         config.prompts.forEach((input, index) => {
             const titleDiv = document.createElement('div');
-            titleDiv.id = 'title';
+            titleDiv.id = 'prompt';
     
             const labelDiv = document.createElement('div');
             labelDiv.id = 'title-text';
@@ -232,14 +233,26 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
         });
     }
 
+    if (flowConfig.dataComponents && Array.isArray(flowConfig.dataComponents)) {
+        flowConfig.dataComponents.forEach(config => {
+            new DataComponent(config, workflow);
+        });
+    }
+
+
     imageLoaderComp(flowConfig, workflow);
     
     const initCanvas = async () => {
         canvasLoader = new CanvasLoader('imageCanvas', flowConfig);
-        await canvasLoader.initPromise;  // Wait for initialization to complete
+        await canvasLoader.initPromise;
     
         if (canvasLoader.isInitialized) {
-            console.log("Canvas initialized successfully with selected plugins.");
+            console.log("Canvas initialized successfully.");
+
+            const container = document.getElementById('pluginUIContainer');
+            const quickControls = document.getElementById('quick-controls');
+            container.append(quickControls);
+
         } else {
             console.log("Canvas was not initialized due to missing flowConfig fields.");
         }
@@ -253,7 +266,7 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
         if (canvasLoader && canvasLoader.isInitialized) {
             await CanvasComponent(flowConfig, workflow, canvasLoader);
         } else {
-            console.warn("Canvas is not initialized. Skipping CanvasComponent.");
+            console.log("Canvas is not initialized. Skipping CanvasComponent.");
         }
 
         console.log("Queueing workflow:", workflow);        
@@ -286,6 +299,10 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
     }
 
     async function processQueue() {
+        store.dispatch({
+            type: 'TOGGLE_MASK',
+            payload: true
+        });
         if (StateManager.isProcessing()) return;
         
         if (StateManager.getJobQueue().length === 0) {
@@ -324,9 +341,7 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
             if (!response.ok) {
                 throw new Error('Failed to process prompt.');
             }
-
             const result = await response.json();
-            // console.log('Prompt processed:', result);
         } catch (error) {
             console.error('Error processing prompt:', error);
             throw error;
@@ -334,6 +349,7 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
             // hideSpinner();
         }
     }
+
     function updateQueueDisplay(jobQueue) {
         const queueDisplay = document.getElementById('queue-display');
         if (!queueDisplay) {
@@ -417,6 +433,8 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
     });
 
     document.addEventListener('DOMContentLoaded', () => {
+        initialize(false, false, false, false);
+
         const overlay = document.getElementById('css-loading-overlay');
         overlay.classList.add('fade-out');
     
@@ -424,5 +442,6 @@ import CanvasComponent from './js/common/components/CanvasComponent.js';
             overlay.style.display = 'none';
         });
     });
+   
 })(window, document, undefined);
 

@@ -20,8 +20,14 @@ const priorityFlowIds = [
     'n0y8e',
     'yigqn',
     '12slf',
-    '28s1h',
+    '89hf7',
+    '3b1ww',
+    'y2gic',
+    'f9k2j',
+    'k5ttn',
+    '3pw8q',
     '67e3l',
+    'j4wox',
 ]; 
 
 const categoryKeywords = [
@@ -42,6 +48,7 @@ const categoryKeywords = [
     'Mochi',
     'Paint',
     'Inpaint',
+    'Inpainting',
     'Detailer',
     'Canvas',
     'Remover',

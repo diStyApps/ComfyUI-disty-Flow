@@ -107,7 +107,10 @@ http://127.0.0.1:8188/flow
 
 ### Feature Support
 - [x] Canvas / Masking / Inpainting Functionality
-- - [ ] Improved Canvas / Masking / Inpainting Functionality
+- - [x] Improved Canvas / Masking / Inpainting Functionality
+- - [ ] Outpainting Functionality
+- - Improving Inpainting Functionality
+
 - [ ] Enhanced Media Handling
 - [x] Live Preview
 - [ ] Prompt Tracking

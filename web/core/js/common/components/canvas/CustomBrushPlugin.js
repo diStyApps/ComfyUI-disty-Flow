@@ -1,4 +1,5 @@
 import { CanvasPlugin } from './CanvasPlugin.js';
+import { store } from  '../../scripts/stateManagerMain.js';
 
 export class CustomBrushPlugin extends CanvasPlugin {
     constructor(options = {}) {
@@ -74,6 +75,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.onMinimize = this.onMinimize.bind(this);
         this.onModeChange = this.onModeChange.bind(this);
         this.brushStrokeIdCounter = 0;
+        this.disableDrawingMode = this.disableDrawingMode.bind(this);
     }
 
     init(canvasManager) {
@@ -165,8 +167,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
                         <img id="cbp-toggle-btn-icon" src=${this.brushIcon}  alt="Toggle Drawing Mode" width="24" height="24">
                     </button>
                     <input type="color" id="cbp-color-picker" value="${this.brushColor}">
-
                 </div>
+                <button id="disableDrawingModeBtn" class="mbp-button" style="width: 100%;  display: none;" title="Disable Drawing Mode">
             </div>
         `;
 
@@ -179,17 +181,22 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.toggleBtnIcon = this.uiContainer.querySelector('#cbp-toggle-btn-icon');
         this.minimizeBtn = this.uiContainer.querySelector('.cbp-brush-ui-minimize-btn');
         this.uiHeader = this.uiContainer.querySelector('.cbp-brush-ui-header');
+        this.disableDrawingModeBtn = this.uiContainer.querySelector('#disableDrawingModeBtn');
 
         this.uiHeader.addEventListener('mousedown', this.onHeaderMouseDown);
         this.minimizeBtn.addEventListener('click', this.onMinimize);
         this.toggleDrawBtn.addEventListener('click', this.onToggleDrawingMode);
+        // this.disableDrawingModeBtn.addEventListener('click', this.disableDrawingMode.bind(this));
     }
 
     attachEventListeners() {
         this.brushSizeInput.addEventListener('input', this.onBrushSizeChange);
         this.brushOpacityInput.addEventListener('input', this.onBrushOpacityChange);
         this.colorPicker.addEventListener('input', this.onColorChange);
+        this.disableDrawingModeBtn.addEventListener('click', this.disableDrawingMode);
+
         window.addEventListener('keydown', this.onKeyDown);
+
     }
 
     detachEventListeners() {
@@ -263,7 +270,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
 
     onToggleDrawingMode() {
         this.drawingMode = !this.drawingMode;
-    
+
+        console.log('Drawing mode:', this.drawingMode);
         const toggleButton = document.getElementById('cbp-toggle-drawing-mode-btn');
         if (this.drawingMode) {
             toggleButton.classList.add('active');
@@ -326,6 +334,51 @@ export class CustomBrushPlugin extends CanvasPlugin {
         }
     }
 
+    disableDrawingMode() {
+        if (this.drawingMode) {
+            this.drawingMode = false;
+            console.log('Drawing mode disabled');
+            
+            this.toggleDrawBtn.classList.remove('active');
+            this.toggleBtnIcon.src = this.brushIcon;
+    
+            this.canvas.defaultCursor = this.originalCanvasProperties.defaultCursor || 'default';
+    
+            this.canvas.lowerCanvasEl.classList.remove(this.hiddenCursorClass);
+            this.canvas.upperCanvasEl.classList.remove(this.hiddenCursorClass);
+    
+            this.disableSelectionBox();
+    
+            this.canvas.getObjects().forEach(obj => {
+                if (this.drawnObjects.has(obj)) {
+                    obj.selectable = false;
+                    obj.evented = false;
+                    obj.hasControls = false;
+                    obj.hasBorders = false;
+                    obj.lockMovementX = true;
+                    obj.lockMovementY = true;
+                }
+            });
+    
+            this.detachDrawingEvents();
+    
+            if (this.cursorCircle) {
+                this.canvas.remove(this.cursorCircle);
+                this.cursorCircle = null;
+            }
+            if (this.secondaryCircle) {
+                this.canvas.remove(this.secondaryCircle);
+                this.secondaryCircle = null;
+            }
+    
+            this.brushSizeInput.disabled = true;
+            this.brushOpacityInput.disabled = true;
+            this.colorPicker.disabled = true;
+    
+            this.setNonDrawnObjectsSelectable(true);
+        }
+    }
+    
     enforceObjectProperties(obj) {
         if (obj === this.cursorCircle || obj === this.secondaryCircle) return;
 
@@ -803,10 +856,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
 
         this.canvas.off('object:added', this.onObjectAdded);
 
-        // Remove viewport:changed listener
         this.canvasManager.off('viewport:changed', this.onViewportChanged);
 
-        // Restore original canvas properties
         if (this.originalCanvasProperties) {
             this.canvas.selection = this.originalCanvasProperties.selection;
             this.canvas.selectionColor = this.originalCanvasProperties.selectionColor;
@@ -817,7 +868,6 @@ export class CustomBrushPlugin extends CanvasPlugin {
             this.canvas.defaultCursor = this.originalCanvasProperties.defaultCursor;
             this.canvas.freeDrawingCursor = this.originalCanvasProperties.freeDrawingCursor;
         }
-
         super.destroy();
     }
 }

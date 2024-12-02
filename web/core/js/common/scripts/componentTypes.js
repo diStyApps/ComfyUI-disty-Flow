@@ -55,8 +55,30 @@ export const componentTypes = {
         { name: 'id', label: 'ID', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
     ],
+    'canvasAlphaOutput': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],
     'canvasSelectedMaskOutput': [
         { name: 'id', label: 'ID', type: 'text' },
         { name: 'label', label: 'Label', type: 'text' },
     ],    
+    'canvasCroppedMaskOutput': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],       
+    'canvasCroppedImageOutput': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],  
+    'canvasCroppedAlphaOnImageOutput': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'label', label: 'Label', type: 'text' },
+    ],
+
+    'dataComponent': [
+        { name: 'id', label: 'ID', type: 'text' },
+        { name: 'name', label: 'NAME', type: 'text' },
+        { name: 'dataPath', label: 'Data Path', type: 'text'},
+    ],
 };

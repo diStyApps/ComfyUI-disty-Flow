@@ -33,6 +33,13 @@ export default function imageLoaderComp(flowConfig, workflow) {
 
     flowConfig.imageLoaders.forEach((imageConfig, index) => {
         const containerId = loadImageContainer.id;
+        const imageDropAreaTitle = document.createElement('div');
+        imageDropAreaTitle.classList.add('image-loader-title');
+        imageDropAreaTitle.textContent = imageConfig.label;
+        loadImageContainer.appendChild(imageDropAreaTitle);
+
+        // console.log("image-loader-title",imageConfig.label);
+        // this.imageDropAreaTitle.textContent = 'Drop an image or video here';
         const imageLoader = new ImageLoader(containerId, {
             allowedFileType: 'image',
             defaultImageSrc: '/core/media/ui/drop_image_rect_no_border_trans.png',
