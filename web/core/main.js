@@ -412,7 +412,12 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
         console.log("Queueing new job");
         queue();
     });
-
+    document.addEventListener('keydown', function(event) {
+        if (event.ctrlKey && event.key === 'Enter') {
+            queue();
+            event.preventDefault();
+        }
+    });
     document.getElementById('interruptButton').addEventListener('click', function () {
         console.log("Interrupting last job");
         interrupt();
