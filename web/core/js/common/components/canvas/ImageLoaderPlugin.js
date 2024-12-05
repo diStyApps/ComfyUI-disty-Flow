@@ -1,4 +1,3 @@
-
 import { CanvasPlugin } from './CanvasPlugin.js';
 
 export class ImageLoaderPlugin extends CanvasPlugin {
@@ -30,7 +29,8 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.onLoadButtonClick = this.onLoadButtonClick.bind(this);
         this.onFileInputChange = this.onFileInputChange.bind(this);
 
-        this.handlePreviewImageLoaded = this.handlePreviewImageLoaded.bind(this);
+        this.handleFinalImageData = this.handleFinalImageData.bind(this);
+        this.handlePreviewImageData = this.handlePreviewImageData.bind(this);
     }
 
     init(canvasManager) {
@@ -45,9 +45,9 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
         this.canvasManager.on('image:remove', this.onImageRemove); 
         
-        window.addEventListener('previewImageLoaded', this.handlePreviewImageLoaded);
-
-
+        window.addEventListener('finalImageData', this.handleFinalImageData);
+        window.addEventListener('previewImageData', this.handlePreviewImageData);
+        
     }
 
     createUI() {
@@ -123,6 +123,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.toggleButton = document.createElement('button');
         this.toggleButton.className = 'il-button il-toggle-button';
         this.toggleButton.id = 'toggleModeBtn';
+
         this.toggleButton.setAttribute('data-mode', this.options.mode);
         this.toggleButton.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -138,6 +139,8 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.loadButton = document.createElement('button');
         this.loadButton.className = 'il-button il-load-button';
         this.loadButton.id = 'loadImageBtn';
+        this.loadButton.title = 'Load Image';
+
         this.loadButton.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -215,46 +218,150 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.canvasManager.off('image:remove', this.onImageRemove);
     }
 
-    onCanvasResized({ width, height }) {
-        this.loadedImages.forEach(({ imageObject, borderRect }) => {
-            const img = imageObject;
-            const border = borderRect;
+    handleImageFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please drop a valid image file.');
+            return;
+        }
 
-            const strokeWidth = border.strokeWidth || 2;
-            const desiredWidth = width - strokeWidth * 2;
-            const desiredHeight = height - strokeWidth * 2;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataURL = e.target.result;
+            this.loadImageFromDataURL(dataURL);
+        };
+        reader.readAsDataURL(file);
+    }
 
-            const imgAspect = img.width / img.height;
-            const canvasAspect = width / height;
+    loadImageFromDataURL(dataURL) {
+        fabric.Image.fromURL(dataURL, (img) => {
+            this.processLoadedImage(img, dataURL);
+        }, { crossOrigin: 'anonymous' });
+    }
 
-            let scaleFactor;
-            if (imgAspect > canvasAspect) {
-                scaleFactor = desiredWidth / img.width;
-            } else {
-                scaleFactor = desiredHeight / img.height;
-            }
+    processLoadedImage(img, dataURL) {
+        const uniqueId = `Image_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-            img.set({
-                scaleX: scaleFactor,
-                scaleY: scaleFactor,
-                left: width / 2,
-                top: height / 2,
-                originX: 'center',
-                originY: 'center',
-                selectable: false,
-                evented: false,
-            });
-
-            border.set({
-                scaleX: scaleFactor,
-                scaleY: scaleFactor,
-                left: width / 2,
-                top: height / 2,
-                originX: 'center',
-                originY: 'center',
-            });
+        img.set({
+            id: uniqueId,
+            originX: 'center',
+            originY: 'center',
+            selectable: false,
+            evented: false,
         });
 
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+
+        this.originalImages[uniqueId] = dataURL;
+
+        const canvasWidth = this.canvas.getWidth();
+        const canvasHeight = this.canvas.getHeight();
+
+        const borderRect = new fabric.Rect({
+            fill: 'transparent',
+            strokeWidth: 2,
+            strokeDashArray: [10, 5], 
+            strokeUniform: true,
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: false,
+            lockMovementX: true,
+            lockMovementY: true,
+            originX: 'center',
+            originY: 'center',
+        });
+
+        const scaleFactor = this.updateImageScaleAndPosition(img, borderRect, canvasWidth, canvasHeight, originalWidth, originalHeight);
+
+        this.canvas.add(img);
+        this.canvas.add(borderRect);
+
+        borderRect.bringToFront();
+
+        this.loadedImages.push({
+            id: uniqueId,
+            imageObject: img,
+            borderRect: borderRect,
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
+            scaleFactor: scaleFactor,
+        });
+
+        if (this.options.mode === 'Single' && this.loadedImages.length > 1) {
+            const imagesToRemove = this.loadedImages.slice(0, -1);
+            imagesToRemove.forEach(({ id }) => {
+                this.removeImageById(id);
+            });
+        }
+
+        this.canvasManager.emit('image:loaded', {
+            image: img,
+            id: uniqueId,
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
+            scaleFactor: scaleFactor,
+        });
+
+        this.canvasManager.emit('image:list:updated', {
+            images: this.loadedImages.map(img => ({
+                id: img.id,
+                left: img.imageObject.left,
+                top: img.imageObject.top,
+                scaleX: img.imageObject.scaleX,
+                scaleY: img.imageObject.scaleY,
+            })),
+        });
+    }
+
+    updateImageScaleAndPosition(img, borderRect, width, height, originalWidth, originalHeight) {
+        const strokeWidth = borderRect.strokeWidth || 2;
+        const desiredWidth = width - strokeWidth * 2;
+        const desiredHeight = height - strokeWidth * 2;
+
+        const imgAspect = originalWidth / originalHeight;
+        const canvasAspect = width / height;
+
+        let scaleFactor;
+        if (imgAspect > canvasAspect) {
+            scaleFactor = desiredWidth / originalWidth;
+        } else {
+            scaleFactor = desiredHeight / originalHeight;
+        }
+
+        img.set({
+            scaleX: scaleFactor,
+            scaleY: scaleFactor,
+            left: width / 2,
+            top: height / 2,
+            originX: 'center',
+            originY: 'center',
+            selectable: false,
+            evented: false,
+        });
+
+        borderRect.set({
+            width: img.getScaledWidth(),
+            height: img.getScaledHeight(),
+            scaleX: 1,
+            scaleY: 1,
+            left: width / 2,
+            top: height / 2,
+            originX: 'center',
+            originY: 'center',
+        });
+
+        return scaleFactor;
+    }
+
+    onCanvasResized({ width, height }) {
+        this.loadedImages.forEach((loadedImage) => {
+            const { imageObject: img, borderRect, originalWidth, originalHeight } = loadedImage;
+
+            const scaleFactor = this.updateImageScaleAndPosition(img, borderRect, width, height, originalWidth, originalHeight);
+
+            loadedImage.scaleFactor = scaleFactor;
+        });
         this.canvas.requestRenderAll();
     }
 
@@ -287,133 +394,8 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         document.body.removeChild(fileInput);
     }
 
-    handleImageFile(file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Please drop a valid image file.');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            fabric.Image.fromURL(e.target.result, (img) => {
-                const uniqueId = `Image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-                img.set({
-                    id: uniqueId,
-                    scaleX: 1, 
-                    scaleY: 1,
-                    left: this.canvas.getWidth() / 2,
-                    top: this.canvas.getHeight() / 2,
-                    originX: 'center',
-                    originY: 'center',
-                    selectable: false,
-                    evented: false,
-                });
-
-                const originalWidth = img.width;
-                const originalHeight = img.height;
-
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = img.width;
-                tempCanvas.height = img.height;
-                const tempCtx = tempCanvas.getContext('2d');
-
-                img.clone((clonedImg) => {
-                    tempCtx.drawImage(clonedImg._element, 0, 0);
-                    const originalDataURL = tempCanvas.toDataURL('image/png');
-                    this.originalImages[uniqueId] = originalDataURL;
-                });
-
-                const canvasWidth = this.canvas.getWidth();
-                const canvasHeight = this.canvas.getHeight();
-                const imgAspect = originalWidth / originalHeight;
-                const canvasAspect = canvasWidth / canvasHeight;
-
-                const strokeWidth = 2; 
-                const desiredWidth = canvasWidth - strokeWidth * 2;
-                const desiredHeight = canvasHeight - strokeWidth * 2;
-                let scaleFactor;
-                if (imgAspect > canvasAspect) {
-                    scaleFactor = desiredWidth / originalWidth;
-                } else {
-                    scaleFactor = desiredHeight / originalHeight;
-                }
-
-                img.set({
-                    scaleX: scaleFactor,
-                    scaleY: scaleFactor,
-                    left: canvasWidth / 2,
-                    top: canvasHeight / 2,
-                    originX: 'center',
-                    originY: 'center',
-                    selectable: false,
-                    evented: false,
-                });
-
-                const borderRect = new fabric.Rect({
-                    width: img.getScaledWidth(),
-                    height: img.getScaledHeight(),
-                    originX: 'center',
-                    originY: 'center',
-                    left: canvasWidth / 2,
-                    top: canvasHeight / 2,
-                    fill: 'transparent',
-                    // stroke: 'rgba(255, 0, 0, 0.5)',
-                    strokeWidth: strokeWidth,
-                    strokeDashArray: [10, 5], 
-                    strokeUniform: true,
-                    selectable: false,
-                    evented: false,
-                    hasControls: false,
-                    hasBorders: false,
-                    lockMovementX: true,
-                    lockMovementY: true,
-                });
-
-                this.canvas.add(img);
-                this.canvas.add(borderRect);
-
-                borderRect.bringToFront();
-
-                this.loadedImages.push({
-                    id: uniqueId,
-                    imageObject: img,
-                    borderRect: borderRect,
-                    originalWidth: originalWidth,
-                    originalHeight: originalHeight,
-                    scaleFactor: scaleFactor,
-                });
-
-                if (this.options.mode === 'Single' && this.loadedImages.length > 1) {
-                    const imagesToRemove = this.loadedImages.slice(0, -1);
-                    imagesToRemove.forEach(({ id }) => {
-                        this.removeImageById(id);
-                    });
-                }
-
-                this.canvasManager.emit('image:loaded', {
-                    image: img,
-                    id: uniqueId,
-                    originalWidth: originalWidth,
-                    originalHeight: originalHeight,
-                    scaleFactor: scaleFactor,
-                });
-
-                this.canvasManager.emit('image:list:updated', {
-                    images: this.loadedImages.map(img => ({
-                        id: img.id,
-                        left: img.imageObject.left,
-                        top: img.imageObject.top,
-                        scaleX: img.imageObject.scaleX,
-                        scaleY: img.imageObject.scaleY,
-                    })),
-                });
-            }, { crossOrigin: 'anonymous' });
-        };
-        reader.readAsDataURL(file);
-    }
-
     getOriginalImage(id) {
+        // console.log("getOriginalImage", this.loadedImages,this.originalImages);
         if (this.loadedImages.length === 0) {
             console.warn('No images loaded.');
             return null;
@@ -424,6 +406,8 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         }
 
         const latestImage = this.loadedImages[this.loadedImages.length - 1];
+        // console.log("getOriginalImage latestImage", latestImage,this.originalImages);
+
         return this.originalImages[latestImage.id] || null;
     }
 
@@ -437,7 +421,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
             delete this.originalImages[id];
 
-            // console.log(`ImageLoaderPlugin: Removed image with ID=${id}`);
             this.canvasManager.emit('image:removed', { id });
 
             this.canvasManager.emit('image:list:updated', {
@@ -452,7 +435,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
             if (this.options.mode === 'Single' && this.loadedImages.length === 0) {
                 this.canvas.clear();
-                // console.log('ImageLoaderPlugin: Canvas cleared in Single mode');
             }
 
             this.canvas.requestRenderAll();
@@ -462,30 +444,25 @@ export class ImageLoaderPlugin extends CanvasPlugin {
     }
 
     onImageRemove({ id }) {
-        // console.log(`ImageLoaderPlugin: Received request to remove image ID=${id}`);
         this.removeImageById(id);
     }
 
-    handlePreviewImageLoaded(event) {
+    handleFinalImageData(event) {
         const combinedDataURL = event.detail;
         if (combinedDataURL) {
             this.loadImageFromDataURL(combinedDataURL);
-            // console.log('ImageLoaderPlugin: Received and loading preview image.');
         } else {
-            console.error('ImageLoaderPlugin: No image data received in previewImageLoaded event.');
+            console.error('ImageLoaderPlugin: No image data received in finalImageData event.');
         }
     }
-
-    loadImageFromDataURL(dataURL) {
-        fetch(dataURL)
-            .then(response => response.blob())
-            .then(blob => {
-                const file = new File([blob], 'preview.png', { type: 'image/png' });
-                this.handleImageFile(file);
-            })
-            .catch(error => {
-                console.error('ImageLoaderPlugin: Failed to convert Data URL to File.', error);
-            });
+    
+    handlePreviewImageData(event) {
+        const combinedDataURL = event.detail;
+        if (combinedDataURL) {
+            this.loadImageFromDataURL(combinedDataURL);
+        } else {
+            console.error('ImageLoaderPlugin: No image data received in previewImageData event.');
+        }
     }
 
     destroy() {
@@ -493,13 +470,17 @@ export class ImageLoaderPlugin extends CanvasPlugin {
             this.uiContainer.parentNode.removeChild(this.uiContainer);
         }
         this.detachEventListeners();
+    
         this.loadedImages.forEach(({ imageObject, borderRect }) => {
             this.canvas.remove(imageObject);
             this.canvas.remove(borderRect);
         });
+
         this.loadedImages = [];
         this.originalImages = {};
         this.canvas.requestRenderAll();
-        window.removeEventListener('previewImageLoaded', this.handlePreviewImageLoaded);
+        window.removeEventListener('finalImageData', this.handleFinalImageData);
+        window.removeEventListener('previewImageData', this.handlePreviewImageData);
+
     }
 }

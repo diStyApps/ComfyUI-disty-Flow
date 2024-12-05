@@ -160,7 +160,8 @@ export class MaskExportUtilities {
         const { minX, minY, maxX, maxY } = this._getBoundingBox(canvas);
 
         if (maxX < minX || maxY < minY) {
-            alert('Selected mask is completely transparent.');
+            // alert('Selected mask is completely transparent.');
+            
             return null;
         }
 
@@ -179,7 +180,7 @@ export class MaskExportUtilities {
         const config = { ...this.config, ...overrides };
 
         if (!this.plugin.currentMask) {
-            alert('No mask selected to export.');
+            // alert('No mask selected to export.');
             return null;
         }
 

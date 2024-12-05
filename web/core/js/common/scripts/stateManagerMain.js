@@ -23,7 +23,7 @@ class StateManager {
     }
 
     subscribe(listener) {
-        console.log('New subscriber added to StateManager');
+        // console.log('New subscriber added to StateManager');
         if (typeof listener !== 'function') {
             throw new TypeError('Listener must be a function');
         }
@@ -32,13 +32,13 @@ class StateManager {
         listener(this.getState());
 
         return () => {
-            console.log('Subscriber removed from StateManager');
+            // console.log('Subscriber removed from StateManager');
             this.listeners.delete(listener);
         };
     }
 
     dispatch(action) {
-        console.log('Action dispatched:', action);
+        // console.log('Action dispatched:', action);
         if (!action || typeof action !== 'object' || !action.type) {
             throw new TypeError('Action must be an object with a type property');
         }
@@ -69,15 +69,15 @@ class StateManager {
     reducer(state, action) {
         switch (action.type) {
             case 'SET_VIEW':
-                return { ...state, view: action.payload };
+                return { ...state, viewType: action.payload };
             case 'TOGGLE_MASK':
                 return { ...state, hideMask: !state.hideMask };
             case 'SET_HIDE_MASK':
                 return { ...state, hideMask: action.payload };
             case 'SET_CROPPED_IMAGE':
                 return { ...state, croppedImage: action.payload };
-            case 'SET_INPAINT_STYLE':
-                return { ...state, inpiantStyle: action.payload };
+            case 'SET_MASKING_TYPE':
+                return { ...state, maskingType: action.payload };
             case 'RESET_STATE':
                 return this.constructor.initialState;
             default:
@@ -86,7 +86,7 @@ class StateManager {
     }
 
     notifyListeners() {
-        console.log('Notifying', this.listeners.size, 'listeners');
+        // console.log('Notifying', this.listeners.size, 'listeners');
         this.listeners.forEach(listener => {
             try {
                 listener(this.getState());
@@ -107,13 +107,13 @@ class StateManager {
         if (this.history.length > this.historyLimit) {
             this.history.shift();
         }
-        console.log('History updated, current length:', this.history.length);
+        // console.log('History updated, current length:', this.history.length);
     }
 }
 
 export const store = new StateManager({
-    view: 'output', // Possible values: 'output', 'canvas', 'splitView'
+    viewType: 'standardView', // Possible values: 'standardView', 'canvasView', 'splitView'
     hideMask:false,
     croppedImage: {},
-    inpiantStyle: 'full', // Possible values: 'full', 'cropped'
+    maskingType: 'full', // Possible values: 'full', 'cropped'
 });

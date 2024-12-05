@@ -40,7 +40,7 @@ class Seeder {
             <span for="${this.config.id}Input">${this.config.label}</span>
             <input type="text" id="${this.config.id}Input" value="${this.config.initialSeed}">
             <div class="seeder-buttons">
-                <button id="${this.config.id}RandomSeedButton">R</button>
+                <button id="${this.config.id}RandomSeedButton" title="Long press will set/disable fixed seed">R</button>
                 <button id="${this.config.id}DecrementButton">-</button>
                 <button id="${this.config.id}IncrementButton">+</button>
             </div>

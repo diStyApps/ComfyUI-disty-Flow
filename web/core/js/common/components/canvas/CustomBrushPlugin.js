@@ -24,8 +24,11 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.canvasManager = null;
         this.canvas = null;
         this.drawingMode = false;
+        this.brushToggledByKey = false;
         this.isMouseDown = false;
         this.lastPointer = null;
+        this.isMouseOverCanvas = false;
+
         this.currentPath = null;
         this.brushIcon = '/core/media/ui/paintree.png';
 
@@ -76,6 +79,9 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.onModeChange = this.onModeChange.bind(this);
         this.brushStrokeIdCounter = 0;
         this.disableDrawingMode = this.disableDrawingMode.bind(this);
+        this.enableDrawingMode = this.enableDrawingMode.bind(this);
+        this.onCanvasPointerEnter = this.onCanvasPointerEnter.bind(this);
+        this.onCanvasPointerLeave = this.onCanvasPointerLeave.bind(this);
     }
 
     init(canvasManager) {
@@ -90,6 +96,13 @@ export class CustomBrushPlugin extends CanvasPlugin {
 
         this.createUI();
 
+        // if (this.canvasElement) {
+        //     if (this.canvasElement.tagName.toLowerCase() === 'canvas' && !this.canvasElement.hasAttribute('tabindex')) {
+        //         this.canvasElement.setAttribute('tabindex', '0');
+        //         // console.log('Set tabindex="0" on the canvas element to make it focusable.');
+        //     }
+        // }
+
         this.attachEventListeners();
 
         this.brushSizeInput.value = this.brushSize;
@@ -101,6 +114,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.canvas.getObjects().forEach(this.enforceObjectProperties);
 
         this.canvasManager.on('viewport:changed', this.onViewportChanged);
+        this.canvasManager.on('pan:toggled', this.disableDrawingMode);
     }
 
     injectHiddenCursorCSS() {
@@ -168,12 +182,10 @@ export class CustomBrushPlugin extends CanvasPlugin {
                     </button>
                     <input type="color" id="cbp-color-picker" value="${this.brushColor}">
                 </div>
-                <button id="disableDrawingModeBtn" class="mbp-button" style="width: 100%;  display: none;" title="Disable Drawing Mode">
             </div>
         `;
 
         document.body.appendChild(this.uiContainer);
-
         this.brushSizeInput = this.uiContainer.querySelector('#cbp-brush-size-input');
         this.brushOpacityInput = this.uiContainer.querySelector('#cbp-brush-opacity-input');
         this.colorPicker = this.uiContainer.querySelector('#cbp-color-picker');
@@ -181,22 +193,31 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.toggleBtnIcon = this.uiContainer.querySelector('#cbp-toggle-btn-icon');
         this.minimizeBtn = this.uiContainer.querySelector('.cbp-brush-ui-minimize-btn');
         this.uiHeader = this.uiContainer.querySelector('.cbp-brush-ui-header');
-        this.disableDrawingModeBtn = this.uiContainer.querySelector('#disableDrawingModeBtn');
 
         this.uiHeader.addEventListener('mousedown', this.onHeaderMouseDown);
         this.minimizeBtn.addEventListener('click', this.onMinimize);
         this.toggleDrawBtn.addEventListener('click', this.onToggleDrawingMode);
-        // this.disableDrawingModeBtn.addEventListener('click', this.disableDrawingMode.bind(this));
     }
 
     attachEventListeners() {
         this.brushSizeInput.addEventListener('input', this.onBrushSizeChange);
         this.brushOpacityInput.addEventListener('input', this.onBrushOpacityChange);
         this.colorPicker.addEventListener('input', this.onColorChange);
-        this.disableDrawingModeBtn.addEventListener('click', this.disableDrawingMode);
+        document.addEventListener('keydown', (e) => {
+            this.onKeyDown(e);
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            this.onKeyUp(e);
+        });
+        
 
-        window.addEventListener('keydown', this.onKeyDown);
-
+        if (this.canvasElement) {
+            this.canvasElement.addEventListener('pointerenter', this.onCanvasPointerEnter);
+            this.canvasElement.addEventListener('pointerleave', this.onCanvasPointerLeave);
+            // console.log('Attached pointerenter and pointerleave to canvasElement.');
+        }
+        
     }
 
     detachEventListeners() {
@@ -208,14 +229,187 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.uiHeader.removeEventListener('mousedown', this.onHeaderMouseDown);
         this.minimizeBtn.removeEventListener('click', this.onMinimize);
         this.toggleDrawBtn.removeEventListener('click', this.onToggleDrawingMode);
+        document.removeEventListener('keydown', this.onKeyDown);
+        document.removeEventListener('keyup', this.onKeyUp);
     }
 
-    onKeyDown(e) {        
-        // // Toggle Drawing Mode (e.g., press 'D')
-        // if (e.key.toLowerCase() === 'd') {
-        //     e.preventDefault();
-        //     this.onToggleDrawingMode();
-        // }
+    onCanvasPointerEnter(e) {
+        if (this.isMouseOverCanvas) return; // Prevent redundant processing
+        this.isMouseOverCanvas = true;
+
+        if (this.canvasElement && typeof this.canvasElement.focus === 'function') {
+            this.canvasElement.focus();
+        }
+
+        if (this.drawingMode && !this.showSystemCursor) {
+            // this.updateCursorCircle();
+            if (this.canvas.lowerCanvasEl) this.canvas.lowerCanvasEl.classList.add(this.hiddenCursorClass);
+            if (this.canvas.upperCanvasEl) this.canvas.upperCanvasEl.classList.add(this.hiddenCursorClass);
+        }
+    }
+
+    onCanvasPointerLeave(e) {
+        if (!this.isMouseOverCanvas) return; // Prevent redundant processing
+        this.isMouseOverCanvas = false;
+
+        if (this.canvasElement && typeof this.canvasElement.blur === 'function') {
+            this.canvasElement.blur();
+        }
+
+        if (this.drawingMode && !this.showSystemCursor) {
+            if (this.canvas.lowerCanvasEl) this.canvas.lowerCanvasEl.classList.remove(this.hiddenCursorClass);
+            if (this.canvas.upperCanvasEl) this.canvas.upperCanvasEl.classList.remove(this.hiddenCursorClass);
+        }
+
+        // Ensure cursor circles are hidden when mouse leaves
+        if (this.drawingMode) {
+            if (this.cursorCircle) {
+                this.cursorCircle.visible = false;
+            }
+            if (this.secondaryCircle) {
+                this.secondaryCircle.visible = false;
+            }
+            this.canvas.requestRenderAll();
+        }
+    }
+
+    onKeyDown(e) {
+        const key = e.key;
+        if (['Alt', 'Control', 'Shift'].includes(key)) {
+            if (this.drawingMode) {
+                this.disableDrawingMode();
+                this.brushToggledByKey = true; 
+                // console.log(`Brush disabled via ${key} key press.`);
+            }
+        }
+
+        switch (key) {
+            case 'd':
+                this.onToggleDrawingMode();
+                break;                  
+            default:
+                break;
+        }
+
+        if (this.isMouseOverCanvas) {
+            e.preventDefault();
+        }
+    }
+
+    onKeyUp(e) {
+        const key = e.key;
+        if (['Alt', 'Control', 'Shift'].includes(key)) {
+            if (this.brushToggledByKey) {
+                this.enableDrawingMode();
+                this.brushToggledByKey = false;
+                // console.log(`Brush re-enabled via ${key} key release.`);
+            }
+        }
+
+        if (this.isMouseOverCanvas) {
+            e.preventDefault();
+        }
+    }
+    
+
+    disableSelectionBox() {
+        this.canvas.selection = false;
+        this.canvas.selectionColor = 'transparent';
+        this.canvas.selectionBorderColor = 'transparent';
+        this.canvas.selectionLineWidth = 0;
+
+        this.canvas.hoverCursor = 'default';
+        this.canvas.moveCursor = 'default';
+        this.canvas.freeDrawingCursor = 'none';
+
+        this.canvas.skipTargetFind = true;
+        this.canvas.preserveObjectStacking = true;
+    }
+
+    configureCanvasObjects(isDrawingMode) {
+        this.disableSelectionBox();
+        this.setDrawnObjectsProperties(!isDrawingMode);
+        this.enableDrawingControls(isDrawingMode);
+        this.setNonDrawnObjectsSelectable(!isDrawingMode);
+    }
+    
+    enableDrawingMode() {
+        this.drawingMode = true;
+        this.updateToggleButton(true);
+
+        this.canvas.defaultCursor = this.showSystemCursor ? 'default' : 'none';
+        if (!this.showSystemCursor) {
+            if (this.lowerCanvasEl) this.lowerCanvasEl.classList.add(this.hiddenCursorClass);
+            if (this.upperCanvasEl) this.upperCanvasEl.classList.add(this.hiddenCursorClass);
+        }
+
+        this.configureCanvasObjects(true);
+        this.attachDrawingEvents();
+        this.updateCursorCircle();
+        this.canvas.requestRenderAll();
+    }
+
+    disableDrawingMode() {
+        this.drawingMode = false;
+        this.updateToggleButton(false);
+
+        this.canvas.defaultCursor = this.originalCanvasProperties.defaultCursor || 'default';
+        if (this.lowerCanvasEl) this.lowerCanvasEl.classList.remove(this.hiddenCursorClass);
+        if (this.upperCanvasEl) this.upperCanvasEl.classList.remove(this.hiddenCursorClass);
+
+        this.configureCanvasObjects(false);
+        this.detachDrawingEvents();
+        this.removeCursorCircles();
+    }
+    
+    updateToggleButton(isActive) {
+        const toggleButton = document.getElementById('cbp-toggle-drawing-mode-btn');
+        if (isActive) {
+            toggleButton.classList.add('active');
+        } else {
+            toggleButton.classList.remove('active');
+        }
+        this.toggleBtnIcon.src = this.brushIcon;
+    }
+    
+    setDrawnObjectsProperties(selectable) {
+        this.canvas.getObjects().forEach(obj => {
+            if (this.drawnObjects.has(obj)) {
+                obj.selectable = selectable;
+                obj.evented = selectable;
+                obj.hasControls = selectable;
+                obj.hasBorders = selectable;
+                obj.lockMovementX = !selectable;
+                obj.lockMovementY = !selectable;
+            }
+        });
+    }
+    
+    enableDrawingControls(enabled) {
+        this.brushSizeInput.disabled = !enabled;
+        this.brushOpacityInput.disabled = !enabled;
+        this.colorPicker.disabled = !enabled;
+    }
+    
+    removeCursorCircles() {
+        if (this.cursorCircle) {
+            this.canvas.remove(this.cursorCircle);
+            this.cursorCircle = null;
+        }
+        if (this.secondaryCircle) {
+            this.canvas.remove(this.secondaryCircle);
+            this.secondaryCircle = null;
+        }
+    }
+    
+    onToggleDrawingMode() {
+        if (!this.drawingMode) {
+            this.enableDrawingMode();
+            this.canvasManager.emit('brush:activated');
+        } else {
+            this.disableDrawingMode();
+            this.canvasManager.emit('brush:deactivated');
+        }
     }
 
     onBrushSizeChange(e) {
@@ -254,131 +448,6 @@ export class CustomBrushPlugin extends CanvasPlugin {
         };
     }
 
-    disableSelectionBox() {
-        this.canvas.selection = false;
-        this.canvas.selectionColor = 'transparent';
-        this.canvas.selectionBorderColor = 'transparent';
-        this.canvas.selectionLineWidth = 0;
-
-        this.canvas.hoverCursor = 'default';
-        this.canvas.moveCursor = 'default';
-        this.canvas.freeDrawingCursor = 'none';
-
-        this.canvas.skipTargetFind = true;
-        this.canvas.preserveObjectStacking = true;
-    }
-
-    onToggleDrawingMode() {
-        this.drawingMode = !this.drawingMode;
-
-        console.log('Drawing mode:', this.drawingMode);
-        const toggleButton = document.getElementById('cbp-toggle-drawing-mode-btn');
-        if (this.drawingMode) {
-            toggleButton.classList.add('active');
-        } else {
-            toggleButton.classList.remove('active');
-        }
-    
-        this.toggleBtnIcon.src = this.brushIcon;
-    
-
-        if (this.drawingMode) {
-            this.canvas.defaultCursor = this.showSystemCursor ? 'default' : 'none';
-
-            if (!this.showSystemCursor) {
-                this.canvas.lowerCanvasEl.classList.add(this.hiddenCursorClass);
-                this.canvas.upperCanvasEl.classList.add(this.hiddenCursorClass);
-            }
-        } else {
-            this.canvas.defaultCursor = this.originalCanvasProperties.defaultCursor || 'default';
-
-            this.canvas.lowerCanvasEl.classList.remove(this.hiddenCursorClass);
-            this.canvas.upperCanvasEl.classList.remove(this.hiddenCursorClass);
-        }
-
-        this.disableSelectionBox();
-
-        this.canvas.getObjects().forEach(obj => {
-            if (this.drawnObjects.has(obj)) {
-                obj.selectable = false;
-                obj.evented = false;
-                obj.hasControls = false;
-                obj.hasBorders = false;
-                obj.lockMovementX = true;
-                obj.lockMovementY = true;
-            }
-        });
-
-        if (this.drawingMode) {
-            this.attachDrawingEvents();
-            this.brushSizeInput.disabled = false;
-            this.brushOpacityInput.disabled = false;
-            this.colorPicker.disabled = false;
-            this.updateCursorCircle();
-            this.canvas.requestRenderAll();
-            this.setNonDrawnObjectsSelectable(false);
-        } else {
-            this.detachDrawingEvents();
-            if (this.cursorCircle) {
-                this.canvas.remove(this.cursorCircle);
-                this.cursorCircle = null;
-            }
-            if (this.secondaryCircle) {
-                this.canvas.remove(this.secondaryCircle);
-                this.secondaryCircle = null;
-            }
-            this.brushSizeInput.disabled = true;
-            this.brushOpacityInput.disabled = true;
-            this.colorPicker.disabled = true;
-            this.setNonDrawnObjectsSelectable(true);
-        }
-    }
-
-    disableDrawingMode() {
-        if (this.drawingMode) {
-            this.drawingMode = false;
-            console.log('Drawing mode disabled');
-            
-            this.toggleDrawBtn.classList.remove('active');
-            this.toggleBtnIcon.src = this.brushIcon;
-    
-            this.canvas.defaultCursor = this.originalCanvasProperties.defaultCursor || 'default';
-    
-            this.canvas.lowerCanvasEl.classList.remove(this.hiddenCursorClass);
-            this.canvas.upperCanvasEl.classList.remove(this.hiddenCursorClass);
-    
-            this.disableSelectionBox();
-    
-            this.canvas.getObjects().forEach(obj => {
-                if (this.drawnObjects.has(obj)) {
-                    obj.selectable = false;
-                    obj.evented = false;
-                    obj.hasControls = false;
-                    obj.hasBorders = false;
-                    obj.lockMovementX = true;
-                    obj.lockMovementY = true;
-                }
-            });
-    
-            this.detachDrawingEvents();
-    
-            if (this.cursorCircle) {
-                this.canvas.remove(this.cursorCircle);
-                this.cursorCircle = null;
-            }
-            if (this.secondaryCircle) {
-                this.canvas.remove(this.secondaryCircle);
-                this.secondaryCircle = null;
-            }
-    
-            this.brushSizeInput.disabled = true;
-            this.brushOpacityInput.disabled = true;
-            this.colorPicker.disabled = true;
-    
-            this.setNonDrawnObjectsSelectable(true);
-        }
-    }
-    
     enforceObjectProperties(obj) {
         if (obj === this.cursorCircle || obj === this.secondaryCircle) return;
 
@@ -422,10 +491,122 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.canvas.off('mouse:out', this.handleMouseOut);
     }
 
+    // updateCursorCircle() {
+    //     const dashArray = this.getStrokeDashArray();
+    //     const isOutlined = this.cursorOutlineType === 'dashed' || this.cursorOutlineType === 'dotted';
+
+    //     if (!this.cursorCircle) {
+    //         this.cursorCircle = new fabric.Circle({
+    //             radius: this.brushSize / 2,
+    //             fill: this.cursorFill
+    //                 ? (this.useBrushColorPrimaryColor
+    //                     ? this.getFillColorWithOpacity(this.brushColor, this.brushOpacity)
+    //                     : this.getFillColorWithOpacity(this.cursorPrimaryColor, this.cursorRingOpacityAffected ? this.brushOpacity : 1))
+    //                 : 'transparent',
+    //             stroke: this.getCursorStrokeColor(),
+    //             strokeWidth: this.cursorOutlineType === 'none' ? 0 : this.cursorLineWidth,
+    //             selectable: false,
+    //             evented: false,
+    //             hasControls: false,
+    //             hasBorders: false,
+    //             originX: 'center',
+    //             originY: 'center',
+    //             strokeDashArray: dashArray,
+    //             hoverCursor: 'none'
+    //         });
+
+    //         if (isOutlined && !this.useBrushColorForCursorRing) {
+    //             this.secondaryCircle = new fabric.Circle({
+    //                 radius: this.brushSize / 2,
+    //                 fill: 'transparent',
+    //                 stroke: this.cursorSecondaryColor,
+    //                 strokeWidth: this.cursorLineWidth,
+    //                 selectable: false,
+    //                 evented: false,
+    //                 hasControls: false,
+    //                 hasBorders: false,
+    //                 originX: 'center',
+    //                 originY: 'center',
+    //                 strokeDashArray: dashArray,
+    //                 strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
+    //                 hoverCursor: 'none'
+    //             });
+    //             this.canvas.add(this.secondaryCircle);
+    //         }
+
+    //         this.canvas.add(this.cursorCircle);
+    //         if (this.secondaryCircle) {
+    //             this.secondaryCircle.bringToFront();
+    //         }
+    //         this.cursorCircle.bringToFront();
+    //     } else {
+    //         this.cursorCircle.set({
+    //             radius: this.brushSize / 2,
+    //             fill: this.cursorFill
+    //                 ? (this.useBrushColorPrimaryColor
+    //                     ? this.getFillColorWithOpacity(this.brushColor, this.brushOpacity)
+    //                     : this.getFillColorWithOpacity(this.cursorPrimaryColor, this.cursorRingOpacityAffected ? this.brushOpacity : 1))
+    //                 : 'transparent',
+    //             stroke: this.getCursorStrokeColor(),
+    //             strokeWidth: this.cursorOutlineType === 'none' ? 0 : this.cursorLineWidth,
+    //             strokeDashArray: dashArray
+    //         });
+
+    //         if (isOutlined && !this.useBrushColorForCursorRing) {
+    //             if (!this.secondaryCircle) {
+    //                 this.secondaryCircle = new fabric.Circle({
+    //                     radius: this.brushSize / 2,
+    //                     fill: 'transparent',
+    //                     stroke: this.cursorSecondaryColor,
+    //                     strokeWidth: this.cursorLineWidth,
+    //                     selectable: false,
+    //                     evented: false,
+    //                     hasControls: false,
+    //                     hasBorders: false,
+    //                     originX: 'center',
+    //                     originY: 'center',
+    //                     strokeDashArray: dashArray,
+    //                     strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
+    //                     hoverCursor: 'none'
+    //                 });
+    //                 this.canvas.add(this.secondaryCircle);
+    //             } else {
+    //                 this.secondaryCircle.set({
+    //                     radius: this.brushSize / 2,
+    //                     stroke: this.cursorSecondaryColor,
+    //                     strokeWidth: this.cursorLineWidth,
+    //                     strokeDashArray: dashArray,
+    //                     strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0]
+    //                 });
+    //             }
+    //         } else if (this.secondaryCircle) {
+    //             this.canvas.remove(this.secondaryCircle);
+    //             this.secondaryCircle = null;
+    //         }
+    //     }
+
+    //     if (this.currentZoom !== 0) {
+    //         const scale = 1 / this.currentZoom;
+    //         this.cursorCircle.set({
+    //             scaleX: scale,
+    //             scaleY: scale
+    //         });
+    //         if (this.secondaryCircle) {
+    //             this.secondaryCircle.set({
+    //                 scaleX: scale,
+    //                 scaleY: scale
+    //             });
+    //         }
+    //     }
+    // }
+
     updateCursorCircle() {
         const dashArray = this.getStrokeDashArray();
         const isOutlined = this.cursorOutlineType === 'dashed' || this.cursorOutlineType === 'dotted';
-
+    
+        // Define positions off the canvas
+        const offCanvasPosition = -100000; // Position to the top-left outside the canvas
+    
         if (!this.cursorCircle) {
             this.cursorCircle = new fabric.Circle({
                 radius: this.brushSize / 2,
@@ -442,10 +623,12 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 hasBorders: false,
                 originX: 'center',
                 originY: 'center',
+                left: offCanvasPosition, // Set initial horizontal position off-canvas
+                top: offCanvasPosition,  // Set initial vertical position off-canvas
                 strokeDashArray: dashArray,
                 hoverCursor: 'none'
             });
-
+    
             if (isOutlined && !this.useBrushColorForCursorRing) {
                 this.secondaryCircle = new fabric.Circle({
                     radius: this.brushSize / 2,
@@ -458,13 +641,15 @@ export class CustomBrushPlugin extends CanvasPlugin {
                     hasBorders: false,
                     originX: 'center',
                     originY: 'center',
+                    left: offCanvasPosition, // Set initial horizontal position off-canvas
+                    top: offCanvasPosition,  // Set initial vertical position off-canvas
                     strokeDashArray: dashArray,
                     strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
                     hoverCursor: 'none'
                 });
                 this.canvas.add(this.secondaryCircle);
             }
-
+    
             this.canvas.add(this.cursorCircle);
             if (this.secondaryCircle) {
                 this.secondaryCircle.bringToFront();
@@ -482,7 +667,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 strokeWidth: this.cursorOutlineType === 'none' ? 0 : this.cursorLineWidth,
                 strokeDashArray: dashArray
             });
-
+    
             if (isOutlined && !this.useBrushColorForCursorRing) {
                 if (!this.secondaryCircle) {
                     this.secondaryCircle = new fabric.Circle({
@@ -496,6 +681,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
                         hasBorders: false,
                         originX: 'center',
                         originY: 'center',
+                        left: offCanvasPosition, // Set initial horizontal position off-canvas
+                        top: offCanvasPosition,  // Set initial vertical position off-canvas
                         strokeDashArray: dashArray,
                         strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
                         hoverCursor: 'none'
@@ -515,7 +702,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 this.secondaryCircle = null;
             }
         }
-
+    
         if (this.currentZoom !== 0) {
             const scale = 1 / this.currentZoom;
             this.cursorCircle.set({
@@ -529,8 +716,11 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 });
             }
         }
+    
+        // Ensure the canvas is re-rendered to reflect changes
+        this.canvas.requestRenderAll();
     }
-
+    
     getCursorStrokeColor() {
         if (this.cursorOutlineType === 'none') {
             return 'transparent';
@@ -871,4 +1061,3 @@ export class CustomBrushPlugin extends CanvasPlugin {
         super.destroy();
     }
 }
-

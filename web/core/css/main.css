@@ -2188,4 +2188,7 @@ html:not(.css-loading) body {
     }        
     
     
+    .upper-canvas, .lower-canvas {
+        pointer-events: auto !important;
+    }
     

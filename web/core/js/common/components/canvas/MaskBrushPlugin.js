@@ -1,5 +1,3 @@
-
-// MaskBrushPlugin.js
 import { CustomBrushPlugin } from './CustomBrushPlugin.js';
 import { MaskExportUtilities } from './MaskExportUtilities.js';
 import { store } from  '../../scripts/stateManagerMain.js';
@@ -35,10 +33,7 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.onToggleHideMask = this.onToggleHideMask.bind(this);
         this.onToggleHideAllMasks = this.onToggleHideAllMasks.bind(this);
         this.handleStateChange = this.handleStateChange.bind(this);
-        // this.enableDrawingMode = this.enableDrawingMode.bind(this);
-        this.disableDrawingMode = this.disableDrawingMode.bind(this);
-        this.onPanActivated = this.onPanActivated.bind(this);
-        this.onPanDeactivated = this.onPanDeactivated.bind(this);
+
 
         this.maskExportUtilities = new MaskExportUtilities(this);
     }
@@ -61,9 +56,7 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.canvasManager.on('undo:mask:stroke', this.onUndoMaskStroke);
         this.canvasManager.on('redo:mask:stroke', this.onRedoMaskStroke);
         this.canvasManager.on('save:trigger', this.onHandleSaveFromCanvas);
-        // this.onToggleDrawingMode();
-        this.canvasManager.on('pan:activated', this.onPanActivated);
-        this.canvasManager.on('pan:deactivated', this.onPanDeactivated);
+
         this.setupResizeObserver();
     }
 
@@ -181,7 +174,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
                         60 -1 94 -17 22 -28 26 -74 26 -36 0 -60 -6 -76 -18z"/>
                         </g>
                         </svg>
-
                     </button>
                 </div>
                 <div class="mbp-toggle-wrapper">
@@ -352,7 +344,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.hideMaskCheckbox.addEventListener('change', this.onToggleHideMask);
         this.hideAllMasksCheckbox.addEventListener('change', this.onToggleHideAllMasks);
         this.saveMaskBtn.addEventListener('click', this.onHandleSave);
-        this.disableDrawingModeBtn.addEventListener('click', this.disableDrawingMode);
     }
 
     detachAdditionalEventListeners() {
@@ -368,7 +359,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.hideMaskCheckbox.removeEventListener('change', this.onToggleHideMask);
         this.hideAllMasksCheckbox.removeEventListener('change', this.onToggleHideAllMasks);
         this.saveMaskBtn.removeEventListener('click', this.onHandleSave);
-        this.disableDrawingModeBtn.removeEventListener('click', this.disableDrawingMode);
 
         this.canvasManager.off('image:loaded', this.onImageLoaded);
         this.canvasManager.off('canvas:state:changed', this.onCanvasStateChanged);
@@ -391,8 +381,8 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
     }
 
     handleStateChange(state) {
-        console.log('---Current state---', state.hideMask);
-        console.log('---this.clearMasksOnImageLoaded ---', this.clearMasksOnImageLoaded );
+        // console.log('---Current state---', state.hideMask);
+        // console.log('---this.clearMasksOnImageLoaded ---', this.clearMasksOnImageLoaded );
 
 
         if (this.clearMasksOnImageLoaded == false) {
@@ -436,6 +426,9 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
             this.maskStrokeHistory = {};
 
             this.onAddMask();
+            // if (!this.drawingMode) {
+            //     this.disableDrawingMode();
+            // }
         } else {
             this.masks.forEach(mask => {
                 this.canvas.remove(mask.fabricImage);
@@ -601,35 +594,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.updateBrushColorAndCursor();
     }
 
-    disableDrawingMode() {  
-        super.disableDrawingMode();
-    }
-
-    onPanActivated() {
-        this.disableDrawingMode();
-
-    }
-    
-    onPanDeactivated() {
-        // this.disableDrawingMode();
-    }
-
-
-    onToggleDrawingMode() {
-        super.onToggleDrawingMode();
-
-        if (this.drawingMode) {
-            this.canvasManager.emit('mask:activated');
-        }
-
-        // console.log('onToggleDrawingModemask:', store);
-
-        // store.dispatch({
-        //     type: 'TOGGLE_MASK',
-        //     payload: true
-        // });
-    }
-
     onChangeMaskColor() {
         const color = this.brushColor = this.colorPicker.value;
         const selectedOption = this.maskList.options[this.maskList.selectedIndex];
@@ -692,7 +656,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
     }
 
     onApplyColorToExistingMaskChange() {
-        // Additional actions if needed when the checkbox state changes
     }
 
     onMoveMaskUp() {
@@ -888,8 +851,8 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
 
     onMouseMove(o) {
         if (!this.currentMask || !this.currentMask.ctx) {
-            console.error('Cannot draw: currentMask or its context is null.');
-            return;
+            console.warn('Cannot draw: currentMask or its context is null.');
+            // return;
         }
 
         const pointer = this.canvas.getPointer(o.e, true);

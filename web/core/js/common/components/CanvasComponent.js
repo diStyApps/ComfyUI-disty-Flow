@@ -62,7 +62,7 @@ async function processAndUpload(
             let result;
             try {
                 result = await response.json();
-                console.log(`Server Response for ${id}:`, result);
+                // console.log(`Server Response for ${id}:`, result);
             } catch (e) {
                 throw new Error('Invalid JSON response from server.');
             }
@@ -94,7 +94,7 @@ async function processAndUpload(
                     //     // console.log('Mask Image set in MessageHandler');
                     //     break;
                     default:
-                        console.warn(`No setter defined for upload description: ${uploadDescription}`);
+                        // console.warn(`No setter defined for upload description: ${uploadDescription}`);
                 }
             } else {
                 throw new Error('Server response did not include imageUrl or imageName.');
@@ -104,7 +104,7 @@ async function processAndUpload(
             }
         } catch (error) {
             console.error(`Error uploading ${uploadDescription.toLowerCase()} ${id}:`, error);
-            alert(`Error uploading ${label}: ${error.message}`);
+            // alert(`Error uploading ${label}: ${error.message}`);
         } finally {
             hideSpinner();
         }

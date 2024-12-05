@@ -39,7 +39,7 @@ const loadDependencies = async () => {
     }
 };
 
-function setView(view) {
+function setView(viewType) {
     const canvasWrapper = document.getElementById("canvasWrapper");
     const imageContainer = document.getElementById("image-container");
 
@@ -48,12 +48,12 @@ function setView(view) {
         return;
     }
 
-    switch(view) {
-        case 'output':
+    switch(viewType) {
+        case 'standardView':
             imageContainer.style.display = "flex"; 
             canvasWrapper.style.display = "none"; 
             break;
-        case 'canvas':
+        case 'canvasView':
             canvasWrapper.style.display = "flex"; 
             imageContainer.style.display = "none";
             break;
@@ -62,12 +62,11 @@ function setView(view) {
             imageContainer.style.display = "flex";
             break;
         default:
-            console.warn(`Unknown view state: ${view}. Defaulting to 'splitView'.`);
-            canvasWrapper.style.display = "flex";
-            imageContainer.style.display = "flex";
+            console.warn(`Unknown viewType state: ${viewType}. Defaulting to 'standardView'.`);
+            imageContainer.style.display = "flex"; 
+            canvasWrapper.style.display = "none"; 
     }
 }
-
 
 export class CanvasLoader {
     constructor(canvasId, flowConfig) {
@@ -77,10 +76,10 @@ export class CanvasLoader {
         this.initPromise = this.init();
 
         store.subscribe((state) => {
-            setView(state.view);
+            setView(state.viewType);
         });
 
-        setView(this.flowConfig.initialView || store.getState().view);
+        setView(this.flowConfig.initialView || store.getState().viewType);
     }
 
     determineCanvasOptions(flowConfig) {
@@ -90,77 +89,84 @@ export class CanvasLoader {
             undo: true,           
             maskBrush: false,     
             customBrush: false,
-            imageCompareSlider: false,
             imageAdder: false,
             canvasScaleForSave: false,
+            imageCompareSlider: false,
+            switchViewToggleButton: false, 
         };
 
-        // **Case 1**: Load maskBrush if canvasLoadedImages and canvasSelectedMaskOutputs are present
-        if (flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0 &&
-            flowConfig.canvasAlphaOutputs && Array.isArray(flowConfig.canvasAlphaOutputs) && flowConfig.canvasAlphaOutputs.length > 0) {
-            options.maskBrush = true;
-            options.imageLoader = true;
-            store.dispatch({
-                type: 'SET_VIEW',
-                payload: 'canvas'
-            });
-            store.dispatch({
-                type: 'SET_INPAINT_STYLE',
-                payload: 'full'
-            });
-        }
-
-        // **Case 2**: Load customBrush if canvasOutputs are present
+        //img2img
+        // **Case 1**: Load customBrush if canvasOutputs are present
         if (flowConfig.canvasOutputs && Array.isArray(flowConfig.canvasOutputs) && flowConfig.canvasOutputs.length > 0) {
             options.customBrush = true;
             options.imageLoader = true;
             options.canvasScaleForSave = true;
+            options.switchViewToggleButton = true; // Enable toggle button
             store.dispatch({
                 type: 'SET_VIEW',
                 payload: 'splitView'
             });
+            store.dispatch({
+                type: 'SET_MASKING_TYPE',
+                payload: 'none'
+            });
         }
-        // // **Case 3**: Load canvasCroppedImageOutputs if canvasCroppedMaskOutputs are present
-        // if (flowConfig.canvasCroppedMaskOutputs && Array.isArray(flowConfig.canvasCroppedMaskOutputs) && flowConfig.canvasCroppedMaskOutputs.length > 0) {
-        //     options.maskBrush = true;
-        //     options.imageLoader = true;
-        //     store.dispatch({
-        //         type: 'SET_VIEW',
-        //         payload: 'canvas'
-        //     });
-        // }
+        
+        //full alpha mask inpaint
+        // **Case 2**: Load maskBrush if canvasLoadedImages and canvasAlphaOutputs are present
+        if (flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0 &&
+            flowConfig.canvasAlphaOutputs && Array.isArray(flowConfig.canvasAlphaOutputs) && flowConfig.canvasAlphaOutputs.length > 0) {
+            options.maskBrush = true;
+            options.imageLoader = true;
+            options.switchViewToggleButton = true; // Enable toggle button
 
-        //MASK
+            store.dispatch({
+                type: 'SET_VIEW',
+                payload: 'canvasView'
+            });
+            store.dispatch({
+                type: 'SET_MASKING_TYPE',
+                payload: 'full'
+            });
+        }
+
+        //cropped bw mask inpaint
         // **Case 4**: Load canvasCroppedImageOutputs and canvasCroppedMaskOutputs and canvasLoadedImages are present
         if (flowConfig.canvasCroppedImageOutputs && Array.isArray(flowConfig.canvasCroppedImageOutputs) && flowConfig.canvasCroppedImageOutputs.length > 0 &&
             flowConfig.canvasCroppedMaskOutputs && Array.isArray(flowConfig.canvasCroppedMaskOutputs) && flowConfig.canvasCroppedMaskOutputs.length > 0 &&
             flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0) {
                 options.maskBrush = true;
                 options.imageLoader = true;
+                options.switchViewToggleButton = true; // Enable toggle button
+
                 store.dispatch({
                     type: 'SET_VIEW',
-                    payload: 'canvas'
+                    payload: 'canvasView'
                 });
                 store.dispatch({
-                    type: 'SET_INPAINT_STYLE',
+                    type: 'SET_MASKING_TYPE',
                     payload: 'cropped'
                 });
                 
         }
-        //ALPHA MASK
+        //cropped alpha mask inpaint 
+
         // **Case 5**: Load canvasCroppedImageOutputs and canvasCroppedAlphaOnImageOutputs and canvasLoadedImages are present
         if (flowConfig.canvasCroppedImageOutputs && Array.isArray(flowConfig.canvasCroppedImageOutputs) && flowConfig.canvasCroppedImageOutputs.length > 0 &&
             flowConfig.canvasCroppedAlphaOnImageOutputs && Array.isArray(flowConfig.canvasCroppedAlphaOnImageOutputs) && flowConfig.canvasCroppedAlphaOnImageOutputs.length > 0 &&
             flowConfig.canvasLoadedImages && Array.isArray(flowConfig.canvasLoadedImages) && flowConfig.canvasLoadedImages.length > 0) {
                 options.maskBrush = true;
                 options.imageLoader = true;
+                options.imageCompareSlider= true;
+                options.switchViewToggleButton = true; // Enable toggle button
+
                 store.dispatch({
                     type: 'SET_VIEW',
-                    payload: 'canvas'
+                    payload: 'canvasView'
                 });
                 store.dispatch({
-                    type: 'SET_INPAINT_STYLE',
-                    payload: 'cropped'
+                    type: 'SET_MASKING_TYPE',
+                    payload: 'full'
                 });
         }
         return options;
@@ -170,15 +176,12 @@ export class CanvasLoader {
         try {
             this.options = this.determineCanvasOptions(this.flowConfig);
 
-
             if (!this.options.maskBrush && !this.options.customBrush) {
-                console.log("No relevant fields in flowConfig. Canvas will not be displayed or initialized.");
+                console.warn("No relevant fields in flowConfig. Canvas will not be displayed or initialized.");
                 this.hideCanvasUI();
                 return;
             }
 
-            // await loadFabric();
-            // loadScript('/core/js/common/components/canvas/fabric.5.2.4.min.js')
             await loadDependencies();
             const canvasWrapper = document.getElementById('canvasWrapper');
             const pluginUIContainer = document.getElementById('pluginUIContainer');
@@ -200,7 +203,9 @@ export class CanvasLoader {
             }
 
             if (this.options.canvasControls) {
-                const canvasControlsPlugin = new CanvasControlsPlugin();
+                const canvasControlsPlugin = new CanvasControlsPlugin({
+                    switchViewToggleButton: this.options.switchViewToggleButton
+                });
                 this.canvasManager.registerPlugin(canvasControlsPlugin);
             }
 
@@ -268,7 +273,32 @@ export class CanvasLoader {
                 this.canvasManager.registerPlugin(imageAdderPlugin);
             }
 
-            console.log('All selected plugins registered successfully');
+            console.log('All plugins registered successfully');
+
+            this.canvasManager.on('switchView', (newView) => {
+                // console.log(`Switching viewType to: ${newView}`);
+                setView(newView);
+
+                store.dispatch({
+                    type: 'SET_VIEW',
+                    payload: newView
+                });
+
+
+
+            });
+            this.canvasManager.on('switchMaskingPreviewType', (PreviewType) => {
+                console.log(`Switching switchMaskingPreviewType to: ${PreviewType}`);
+                // setView(PreviewType);
+
+                store.dispatch({
+                    type: 'SET_MASKING_TYPE',
+                    payload: PreviewType
+                });
+
+
+
+            });
 
             this.isInitialized = true;
         } catch (error) {
@@ -396,5 +426,6 @@ export class CanvasLoader {
             return null;
         }
     }  
+
 
 }

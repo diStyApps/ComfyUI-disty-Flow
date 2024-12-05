@@ -1,6 +1,5 @@
-// messageHandler.js
 import { WebSocketHandler } from './webSocketHandler.js';
-import { updateProgress, displayImagesInDiv } from './imagedisplay.js';
+import { updateProgress, displayImagesInDiv as displayOutputMedia } from './imagedisplay.js';
 import { hideSpinner } from './utils.js';
 import { store } from  '../scripts/stateManagerMain.js';
 class IMessageProcessor {
@@ -80,6 +79,7 @@ async function detectMimeType(blob) {
     return null;
 }
 
+
 class BlobMessageProcessor extends IMessageProcessor {
     constructor(messageHandler) {
         super();
@@ -88,59 +88,50 @@ class BlobMessageProcessor extends IMessageProcessor {
 
     async process(blob) {
         try {
-            const { view } = store.getState();
-            const { croppedImage } = store.getState();
-            const { inpiantStyle } = store.getState();
+            let result = {};
+
             if (!blob.type) {
                 const headerSize = 8; 
                 if (blob.size <= headerSize) {
                     console.error('Blob size is too small to contain valid image data.');
                     hideSpinner();
-                    return;
+                    result.error = 'Blob size is too small to contain valid image data.';
+                    return result;
                 }
-
                 const slicedBlob = blob.slice(headerSize);
                 const detectedType = await detectMimeType(slicedBlob);
                 const objectURL = URL.createObjectURL(slicedBlob);
                 if (detectedType) {
-                    switch(view) {
-                        case 'output':
-                            this.messageHandler.handleMedia(objectURL, detectedType, false);
-                            break;
-                        case 'canvas':
-                            switch(inpiantStyle) {
-                                case 'full':
-                                    this.messageHandler.overlayPreviewOnOriginal(objectURL, detectedType, false);
-                                    // console.log('Blob message inpiantStyle full:', inpiantStyle);
-                                    break;
-                                case 'cropped':
-                                    this.messageHandler.compositeCroppedPreviewOnOriginal(objectURL, croppedImage);
-                                    // console.log('Blob message inpiantStyle cropped:', inpiantStyle);
-                                    break;
-                            }
-                            break;
-                        case 'splitView':
-                            this.messageHandler.handleMedia(objectURL, detectedType, false);
-                            // this.messageHandler.overlayPreviewOnOriginal(objectURL);
-                            break;
-                    }
+                    result = {
+                        objectURL,
+                        detectedType,
+                        isTypeDetected: true
+                    };
                 } else {
                     console.error('Could not detect MIME type of Blob.');
                     hideSpinner();
+                    result.error = 'Could not detect MIME type of Blob.';
                 }
-                return;
+                return result;
             }
 
             if (blob.type.startsWith('image/') || blob.type.startsWith('video/')) {
                 const objectURL = URL.createObjectURL(blob);
-                this.messageHandler.handleMedia(objectURL, blob.type, true);
+                result = {
+                    objectURL,
+                    detectedType: blob.type,
+                    isTypeDetected: true
+                };
             } else {
                 console.error('Unsupported Blob type:', blob.type);
                 hideSpinner();
+                result.error = 'Unsupported Blob type: ' + blob.type;
             }
+            return result;
         } catch (error) {
             console.error('Error processing Blob message:', error);
             hideSpinner();
+            return { error };
         }
     }
 }
@@ -157,6 +148,7 @@ export class MessageHandler {
         this.maskImageDataURL = null;
         this.canvasCroppedMaskOutputs = null;
         this.AlphaMaskImageDataURL = null;
+        this.imageDataType = null;
     }
 
     setOriginalImage(dataURL) {
@@ -175,7 +167,6 @@ export class MessageHandler {
         this.AlphaMaskImageDataURL = dataURL;
         // console.log('Alpha mask image set for MaskModePreview.');
     }
-
     setCanvasSelectedMaskOutputs(dataURL) {
         if (!dataURL || typeof dataURL !== 'string') {
             console.error('Canvas Selected Mask Outputs should be an array of Data URLs.');
@@ -184,7 +175,6 @@ export class MessageHandler {
         this.canvasSelectedMaskOutputs = dataURL;
         // console.log('Canvas Selected Mask Outputs set successfully.');
     }
-
     setCroppedMaskImage(dataURL) {
         if (!dataURL || typeof dataURL !== 'string') {
             console.error('Canvas Cropped Mask Outputs should be an array of Data URLs.');
@@ -193,7 +183,6 @@ export class MessageHandler {
         this.canvasCroppedMaskOutputs = dataURL;
         // console.log('Canvas Cropped Mask Outputs set successfully.');
     }
-
     setMaskImage(dataURL) {
         if (!dataURL || typeof dataURL !== 'string') {
             console.error('Mask image Data URL is invalid.');
@@ -203,31 +192,65 @@ export class MessageHandler {
         // console.log('Mask image set for MaskModePreview.');
     }
 
-    handleMessage(event) {
+    handlePreviewOutput(result) {
+        if (result.error) {
+            console.error(result.error);
+            return;
+        }
+        const { viewType, croppedImage, maskingType } = store.getState();
+        this.imageDataType = 'previewImageData';
+        if (result.isTypeDetected) {
+            const { objectURL, detectedType} = result;
+            switch(viewType) {
+                case 'standardView':
+                    this.setStandardPreview(objectURL);
+                    break;
+                case 'splitView':
+                    this.setStandardPreview(objectURL);
+                    break;                    
+                case 'canvasView':
+                    switch(maskingType) {
+                        case 'none':
+                            this.canvasPreview(objectURL)
+                            break;
+                        case 'full':
+                            this.canvasFullMaskPreview(objectURL);
+                            break;
+                        case 'cropped':
+                            this.canvasCroppedMaskPreview(objectURL, croppedImage);
+                            break;
+                    }
+                    break;
+                default:
+                    console.warn('Unknown viewType type:', viewType);
+            }
+        } else {
+            console.error('Type not detected or unsupported.');
+        }
+    }
+
+    handlePreviewOutputMessage(event) {
         if (typeof event.data === 'string') {
             this.jsonProcessor.process(event.data);
-            
-        // preview output
         } else if (event.data instanceof Blob) {
-            // console.log('Preview image:');
-            this.blobProcessor.process(event.data);
+            this.blobProcessor.process(event.data).then(result => {
+                this.handlePreviewOutput(result);
+            });
         } else {
             console.warn('Unknown message type:', typeof event.data);
         }
-    }
+    }    
 
     handleProgress(data) {
         this.hideSpinnerOnce();
         updateProgress(data.max, data.value);
     }
-
     hideSpinnerOnce() {
         if (!this.spinnerHidden) {
             hideSpinner();
             this.spinnerHidden = true;
         }
     }
-
     handleMonitor(data) {
         console.log('Monitor data received:', data);
     }
@@ -235,11 +258,11 @@ export class MessageHandler {
     handleExecuted(data) {
         if (data.output) {
             if ('images' in data.output) {
-                this.processImages(data.output.images);
+                this.processFinalImageOutput(data.output.images);
             }
-
+            //gifs = videos
             if ('gifs' in data.output) {
-                this.processGifs(data.output.gifs);
+                this.processFinalVideoOutput(data.output.gifs);
             }
         }
         hideSpinner();
@@ -249,7 +272,7 @@ export class MessageHandler {
         window.dispatchEvent(event);
     }
 
-    async processImages(images) {
+    async processFinalImageOutput(images) {
         const newImageFilenames = [];
         const imageUrls = images.map(image => {
             const { filename } = image;
@@ -257,13 +280,9 @@ export class MessageHandler {
             if (filename.includes('ComfyUI_temp')) {
                 return null;
             }
-            // Detect original image based on filename
-            if (filename.toLowerCase().includes('original')) {
-                // Original image is handled separately
-                return null;
-            }    
+
             if (this.lastImageFilenames.includes(filename)) {
-                console.log('Duplicate image:', filename);
+                // console.log('Duplicate image:', filename);
                 return null;
             }
     
@@ -272,37 +291,37 @@ export class MessageHandler {
             console.log('processImages Image URL:', imageUrl);
             return imageUrl;
         }).filter(url => url !== null);
-        console.log('Image URLs:', imageUrls.length);
-        if (imageUrls.length > 0) {
-            displayImagesInDiv(imageUrls); 
-            for (const url of imageUrls) {
-                try {
-                    const { view } = store.getState();
 
-                    if (view === 'canvas') {
-                        this.emitCombinedImage(url)
-                    }
-                } catch (error) {
-                    console.error('Error overlaying preview on image:', url, error);
-                }
-            }
+        if (imageUrls.length > 0) {
+            displayOutputMedia(imageUrls); 
+            this.displayPreviewOutput(imageUrls)
             this.lastImageFilenames = newImageFilenames;
+            return imageUrls;
+        }
+    }
+
+    displayPreviewOutput(imageUrls) {
+        for (const url of imageUrls) {
+            try {
+                const { viewType } = store.getState();
+                if (viewType === 'canvasView') {
+                    this.imageDataType = 'finalImageData';
+                    this.emitCombinedImage(url)
+                }
+            } catch (error) {
+                console.error('Error overlaying preview on image:', url, error);
+            }
         }
     }
     
-    processGifs(gifs) {
-        const gifUrls = gifs.map(gif => {
-            const { filename } = gif;
-            const gifUrl = `/view?filename=${encodeURIComponent(filename)}`;
-            return gifUrl;
+    processFinalVideoOutput(videos) {
+        const videosUrls = videos.map(video => {
+            const { filename } = video;
+            const videoUrl = `/view?filename=${encodeURIComponent(filename)}`;
+            return videoUrl;
         });
 
-        console.log('GIF URLs:', gifUrls);
-        displayImagesInDiv(gifUrls); 
-    }
-
-    handleMedia(mediaUrl, mediaType, addToHistory = true) {
-        displayImagesInDiv([mediaUrl], addToHistory);
+        displayOutputMedia(videosUrls); 
     }
 
     handleInterrupted() {
@@ -317,7 +336,16 @@ export class MessageHandler {
         updateProgress();
     }
 
-    async compositeCroppedPreviewOnOriginal(previewUrl, croppedImage) {
+    setStandardPreview(mediaUrl, addToHistory = false) {
+        displayOutputMedia([mediaUrl], addToHistory);
+    }
+
+
+    async canvasPreview(objectURL) {
+        this.emitCombinedImage(objectURL);
+
+    }
+    async canvasCroppedMaskPreview(previewUrl, croppedImage) {
         if (!this.originalImageDataURL || !this.canvasCroppedMaskOutputs) {
             console.error('Original image data URL or mask is not provided. Cannot overlay preview.');
             return null;
@@ -331,20 +359,14 @@ export class MessageHandler {
             ]);
 
             const { x, y, width, height } = croppedImage.mask;
-
             const mainCanvas = this.createCanvas(originalImage.width, originalImage.height);
             const mainCtx = mainCanvas.getContext('2d');
-
             mainCtx.drawImage(originalImage, 0, 0);
-
             const maskedPreview = this.prepareMaskedPreview(previewImage, maskImage, width, height);
-
             mainCtx.drawImage(maskedPreview, x, y, width, height);
+            const JPEG_QUALITY = 0.7;
 
-            const JPEG_QUALITY = 0.5;
-
-            const combinedDataURL = mainCanvas.toDataURL('image/jpeg', JPEG_QUALITY);
-
+            const combinedDataURL = mainCanvas.toDataURL('image/webp', JPEG_QUALITY);
             if (combinedDataURL) {
                 this.emitCombinedImage(combinedDataURL);
             }
@@ -354,59 +376,6 @@ export class MessageHandler {
             console.error('Error during compositing:', error);
             return null;
         }
-    }
-
-    async loadImages(urls) {
-        return Promise.all(urls.map(url => this.loadImage(url)));
-    }
-
-
-    createCanvas(width, height) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        return canvas;
-    }
-
-    prepareMaskedPreview(previewImage, maskImage, width, height) {
-        const maskCanvas = this.createCanvas(width, height);
-        const previewCanvas = this.createCanvas(width, height);
-
-        const maskCtx = maskCanvas.getContext('2d');
-        const previewCtx = previewCanvas.getContext('2d');
-
-        const BLUR_RADIUS = 3;
-        maskCtx.filter = `blur(${BLUR_RADIUS}px)`;
-        maskCtx.drawImage(maskImage, 0, 0, width, height);
-        maskCtx.filter = 'none'; 
-
-        previewCtx.drawImage(previewImage, 0, 0, width, height);
-
-        const blurredMaskData = maskCtx.getImageData(0, 0, width, height);
-        const previewData = previewCtx.getImageData(0, 0, width, height);
-
-        const maskedData = this.applyMaskToAlpha(previewData, blurredMaskData);
-
-        previewCtx.putImageData(maskedData, 0, 0);
-
-        return previewCanvas;
-    }
-
-    applyMaskToAlpha(previewData, maskData) {
-        const data = previewData.data;
-        const mask = maskData.data;
-
-        if (data.length !== mask.length) {
-            throw new Error('Preview and mask ImageData must have the same dimensions.');
-        }
-
-        for (let i = 0; i < data.length; i += 4) {
-            const maskAlpha = mask[i];
-            const normalizedAlpha = maskAlpha / 255;
-            data[i + 3] = normalizedAlpha * data[i + 3];
-        }
-
-        return previewData;
     }
 
     async compositePreviewOnOriginal(previewUrl, invertMask = true) {
@@ -447,6 +416,7 @@ export class MessageHandler {
                 }
                 maskCtx.putImageData(maskImageData, 0, 0);
             }
+
     
             let minX = maskCanvas.width, minY = maskCanvas.height, maxX = 0, maxY = 0;
             for (let y = 0; y < maskCanvas.height; y++) {
@@ -524,9 +494,9 @@ export class MessageHandler {
     
             ctx.drawImage(tempCanvas, 0, 0);
     
-            const JPEG_QUALITY = 0.5;
+            const JPEG_QUALITY = 0.7;
 
-            const combinedDataURL = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+            const combinedDataURL = canvas.toDataURL('image/webp', JPEG_QUALITY);
    
             return combinedDataURL;
     
@@ -536,19 +506,71 @@ export class MessageHandler {
         }
     }
 
+    async loadImages(urls) {
+        return Promise.all(urls.map(url => this.loadImage(url)));
+    }
+
+    createCanvas(width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
+    }
+
+    prepareMaskedPreview(previewImage, maskImage, width, height) {
+        const maskCanvas = this.createCanvas(width, height);
+        const previewCanvas = this.createCanvas(width, height);
+
+        const maskCtx = maskCanvas.getContext('2d');
+        const previewCtx = previewCanvas.getContext('2d');
+
+        const BLUR_RADIUS = 3;
+        maskCtx.filter = `blur(${BLUR_RADIUS}px)`;
+        maskCtx.drawImage(maskImage, 0, 0, width, height);
+        maskCtx.filter = 'none'; 
+
+        previewCtx.drawImage(previewImage, 0, 0, width, height);
+
+        const blurredMaskData = maskCtx.getImageData(0, 0, width, height);
+        const previewData = previewCtx.getImageData(0, 0, width, height);
+
+        const maskedData = this.applyMaskToAlpha(previewData, blurredMaskData);
+
+        previewCtx.putImageData(maskedData, 0, 0);
+
+        return previewCanvas;
+    }
+
+    applyMaskToAlpha(previewData, maskData) {
+        const data = previewData.data;
+        const mask = maskData.data;
+
+        if (data.length !== mask.length) {
+            throw new Error('Preview and mask ImageData must have the same dimensions.');
+        }
+
+        for (let i = 0; i < data.length; i += 4) {
+            const maskAlpha = mask[i];
+            const normalizedAlpha = maskAlpha / 255;
+            data[i + 3] = normalizedAlpha * data[i + 3];
+        }
+
+        return previewData;
+    }
+
     emitCombinedImage(combinedDataURL) {
         if (!combinedDataURL) {
             console.error('No combined image data to emit.');
             return;
         }
-        
-        const previewImageEvent = new CustomEvent('previewImageLoaded', {
+        // console.log('Emitting combined image imageDataType.',);
+        const previewImageEvent = new CustomEvent(this.imageDataType, {
             detail: combinedDataURL
         });
         window.dispatchEvent(previewImageEvent);
     }
 
-    async overlayPreviewOnOriginal(previewUrl, invertMask = true) {
+    async canvasFullMaskPreview(previewUrl, invertMask = true) {
         const combinedDataURL = await this.compositePreviewOnOriginal(previewUrl, invertMask);
         
         if (combinedDataURL) {
@@ -586,7 +608,7 @@ export function initializeWebSocket(clientId) {
     const serverAddress = `${window.location.hostname}:${window.location.port}`;
     const wsHandler = new WebSocketHandler(
         `${protocol}://${serverAddress}/ws?clientId=${encodeURIComponent(clientId)}`,
-        (event) => messageHandler.handleMessage(event)
+        (event) => messageHandler.handlePreviewOutputMessage(event)
     );
     wsHandler.connect();
     return wsHandler;
