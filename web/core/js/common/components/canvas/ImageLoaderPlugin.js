@@ -1,5 +1,4 @@
 import { CanvasPlugin } from './CanvasPlugin.js';
-
 export class ImageLoaderPlugin extends CanvasPlugin {
     constructor(options = {}) {
         super('ImageLoaderPlugin');
@@ -36,18 +35,12 @@ export class ImageLoaderPlugin extends CanvasPlugin {
     init(canvasManager) {
         this.canvasManager = canvasManager;
         this.canvas = canvasManager.canvas;
-
         this.createUI();
-
         this.attachEventListeners();
-
         this.canvasManager.on('canvas:resized', this.onCanvasResized);
-
         this.canvasManager.on('image:remove', this.onImageRemove); 
-        
         window.addEventListener('finalImageData', this.handleFinalImageData);
         window.addEventListener('previewImageData', this.handlePreviewImageData);
-        
     }
 
     createUI() {
@@ -123,7 +116,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.toggleButton = document.createElement('button');
         this.toggleButton.className = 'il-button il-toggle-button';
         this.toggleButton.id = 'toggleModeBtn';
-
         this.toggleButton.setAttribute('data-mode', this.options.mode);
         this.toggleButton.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -140,7 +132,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.loadButton.className = 'il-button il-load-button';
         this.loadButton.id = 'loadImageBtn';
         this.loadButton.title = 'Load Image';
-
         this.loadButton.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <rect x="3" y="4" width="18" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -218,107 +209,10 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.canvasManager.off('image:remove', this.onImageRemove);
     }
 
-    handleImageFile(file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Please drop a valid image file.');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const dataURL = e.target.result;
-            this.loadImageFromDataURL(dataURL);
-        };
-        reader.readAsDataURL(file);
-    }
-
-    loadImageFromDataURL(dataURL) {
-        fabric.Image.fromURL(dataURL, (img) => {
-            this.processLoadedImage(img, dataURL);
-        }, { crossOrigin: 'anonymous' });
-    }
-
-    processLoadedImage(img, dataURL) {
-        const uniqueId = `Image_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
-        img.set({
-            id: uniqueId,
-            originX: 'center',
-            originY: 'center',
-            selectable: false,
-            evented: false,
-        });
-
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-
-        this.originalImages[uniqueId] = dataURL;
-
-        const canvasWidth = this.canvas.getWidth();
-        const canvasHeight = this.canvas.getHeight();
-
-        const borderRect = new fabric.Rect({
-            fill: 'transparent',
-            strokeWidth: 2,
-            strokeDashArray: [10, 5], 
-            strokeUniform: true,
-            selectable: false,
-            evented: false,
-            hasControls: false,
-            hasBorders: false,
-            lockMovementX: true,
-            lockMovementY: true,
-            originX: 'center',
-            originY: 'center',
-        });
-
-        const scaleFactor = this.updateImageScaleAndPosition(img, borderRect, canvasWidth, canvasHeight, originalWidth, originalHeight);
-
-        this.canvas.add(img);
-        this.canvas.add(borderRect);
-
-        borderRect.bringToFront();
-
-        this.loadedImages.push({
-            id: uniqueId,
-            imageObject: img,
-            borderRect: borderRect,
-            originalWidth: originalWidth,
-            originalHeight: originalHeight,
-            scaleFactor: scaleFactor,
-        });
-
-        if (this.options.mode === 'Single' && this.loadedImages.length > 1) {
-            const imagesToRemove = this.loadedImages.slice(0, -1);
-            imagesToRemove.forEach(({ id }) => {
-                this.removeImageById(id);
-            });
-        }
-
-        this.canvasManager.emit('image:loaded', {
-            image: img,
-            id: uniqueId,
-            originalWidth: originalWidth,
-            originalHeight: originalHeight,
-            scaleFactor: scaleFactor,
-        });
-
-        this.canvasManager.emit('image:list:updated', {
-            images: this.loadedImages.map(img => ({
-                id: img.id,
-                left: img.imageObject.left,
-                top: img.imageObject.top,
-                scaleX: img.imageObject.scaleX,
-                scaleY: img.imageObject.scaleY,
-            })),
-        });
-    }
-
     updateImageScaleAndPosition(img, borderRect, width, height, originalWidth, originalHeight) {
         const strokeWidth = borderRect.strokeWidth || 2;
         const desiredWidth = width - strokeWidth * 2;
         const desiredHeight = height - strokeWidth * 2;
-
         const imgAspect = originalWidth / originalHeight;
         const canvasAspect = width / height;
 
@@ -357,9 +251,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
     onCanvasResized({ width, height }) {
         this.loadedImages.forEach((loadedImage) => {
             const { imageObject: img, borderRect, originalWidth, originalHeight } = loadedImage;
-
             const scaleFactor = this.updateImageScaleAndPosition(img, borderRect, width, height, originalWidth, originalHeight);
-
             loadedImage.scaleFactor = scaleFactor;
         });
         this.canvas.requestRenderAll();
@@ -392,23 +284,6 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         document.body.appendChild(fileInput);
         fileInput.click();
         document.body.removeChild(fileInput);
-    }
-
-    getOriginalImage(id) {
-        // console.log("getOriginalImage", this.loadedImages,this.originalImages);
-        if (this.loadedImages.length === 0) {
-            console.warn('No images loaded.');
-            return null;
-        }
-
-        if (id) {
-            return this.originalImages[id] || null;
-        }
-
-        const latestImage = this.loadedImages[this.loadedImages.length - 1];
-        // console.log("getOriginalImage latestImage", latestImage,this.originalImages);
-
-        return this.originalImages[latestImage.id] || null;
     }
 
     removeImageById(id) {
@@ -447,24 +322,220 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.removeImageById(id);
     }
 
-    handleFinalImageData(event) {
-        const combinedDataURL = event.detail;
-        if (combinedDataURL) {
-            this.loadImageFromDataURL(combinedDataURL);
-        } else {
-            console.error('ImageLoaderPlugin: No image data received in finalImageData event.');
+    async handleImageFile(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please drop a valid image file.');
+            return;
         }
-    }
-    
-    handlePreviewImageData(event) {
-        const combinedDataURL = event.detail;
-        if (combinedDataURL) {
-            this.loadImageFromDataURL(combinedDataURL);
-        } else {
-            console.error('ImageLoaderPlugin: No image data received in previewImageData event.');
+
+        try {
+            const dataURL = await this.readFileAsDataURL(file);
+            this.loadImageFromDataURL(dataURL);
+        } catch (error) {
+            console.error('ImageLoaderPlugin: Failed to read the image file.', error);
         }
     }
 
+    readFileAsDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataURL = e.target.result;
+                if (this.isValidDataURL(dataURL)) {
+                    resolve(dataURL);
+                } else {
+                    reject(new Error('FileReader did not return a valid data URL.'));
+                }
+            };
+            reader.onerror = () => {
+                reject(new Error('Failed to read the image file.'));
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    processLoadedImage(img, dataURL) {
+        if (!this.isValidDataURL(dataURL)) {
+            console.error('ImageLoaderPlugin: Provided dataURL is not a valid image data URL.');
+            return;
+        }
+
+        const uniqueId = `Image_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+        img.set({
+            id: uniqueId,
+            originX: 'center',
+            originY: 'center',
+            selectable: false,
+            evented: false,
+        });
+
+        this.originalImages[uniqueId] = dataURL;
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        const canvasWidth = this.canvas.getWidth();
+        const canvasHeight = this.canvas.getHeight();
+
+        const borderRect = new fabric.Rect({
+            fill: 'transparent',
+            strokeWidth: 2,
+            strokeDashArray: [10, 5], 
+            strokeUniform: true,
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: false,
+            lockMovementX: true,
+            lockMovementY: true,
+            originX: 'center',
+            originY: 'center',
+        });
+
+        const scaleFactor = this.updateImageScaleAndPosition(img, borderRect, canvasWidth, canvasHeight, originalWidth, originalHeight);
+
+        this.canvas.add(img);
+        this.canvas.add(borderRect);
+        borderRect.bringToFront();
+
+        this.loadedImages.push({
+            id: uniqueId,
+            imageObject: img,
+            borderRect: borderRect,
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
+            scaleFactor: scaleFactor,
+        });
+
+        if (this.options.mode === 'Single' && this.loadedImages.length > 1) {
+            const imagesToRemove = this.loadedImages.slice(0, -1);
+            imagesToRemove.forEach(({ id }) => {
+                this.removeImageById(id);
+            });
+        }
+
+        this.canvasManager.emit('image:loaded', {
+            image: img,
+            id: uniqueId,
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
+            scaleFactor: scaleFactor,
+        });
+
+        this.canvasManager.emit('image:list:updated', {
+            images: this.loadedImages.map(img => ({
+                id: img.id,
+                left: img.imageObject.left,
+                top: img.imageObject.top,
+                scaleX: img.imageObject.scaleX,
+                scaleY: img.imageObject.scaleY,
+            })),
+        });
+
+        this.canvas.requestRenderAll();
+    }
+
+    async handlePreviewImageData(event) {
+        const imageData = event.detail;
+        if (typeof imageData !== 'string') {
+            console.error('ImageLoaderPlugin: Invalid image data received in previewImageData event.');
+            return;
+        }
+
+        let dataURL = imageData;
+        if (!this.isValidDataURL(dataURL)) {
+            try {
+                dataURL = await this.convertURLToDataURL(dataURL);
+            } catch (error) {
+                console.error('ImageLoaderPlugin: Unable to convert image URL to Data URL.', error);
+                return;
+            }
+        }
+
+        this.loadImageFromDataURL(dataURL);
+    }
+
+    async handleFinalImageData(event) {
+        const imageData = event.detail;
+        if (typeof imageData !== 'string') {
+            console.error('ImageLoaderPlugin: Invalid image data received in finalImageData event.');
+            return;
+        }
+
+        let dataURL = imageData;
+        if (!this.isValidDataURL(dataURL)) {
+            try {
+                dataURL = await this.convertURLToDataURL(dataURL);
+            } catch (error) {
+                console.error('ImageLoaderPlugin: Unable to convert image URL to Data URL.', error);
+                return;
+            }
+        }
+
+        this.loadImageFromDataURL(dataURL);
+    }
+
+    isValidDataURL(dataURL) {
+        return typeof dataURL === 'string' && dataURL.startsWith('data:image/');
+    }
+
+    convertURLToDataURL(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                try {
+                    const convertedDataURL = canvas.toDataURL();
+                    resolve(convertedDataURL);
+                } catch (error) {
+                    reject(new Error('Failed to convert image to Data URL.'));
+                }
+            };
+            img.onerror = () => {
+                reject(new Error('Failed to load image for conversion.'));
+            };
+            img.src = url;
+        });
+    }
+
+    loadImageFromDataURL(dataURL) {
+        if (!this.isValidDataURL(dataURL)) {
+            console.error('ImageLoaderPlugin: Provided dataURL is not a valid image data URL.');
+            return;
+        }
+        fabric.Image.fromURL(dataURL, (img) => {
+            this.processLoadedImage(img, dataURL);
+        }, { crossOrigin: 'anonymous' });
+    }
+
+    getOriginalImage(id) {
+        // console.log("getOriginalImage", this.loadedImages, this.originalImages);
+        if (this.loadedImages.length === 0) {
+            console.error('No images loaded.');
+            return null;
+        }
+
+        let dataURL;
+        if (id) {
+            dataURL = this.originalImages[id];
+        } else {
+            const latestImage = this.loadedImages[this.loadedImages.length - 1];
+            // console.log("getOriginalImage latestImage", latestImage, this.originalImages);
+            dataURL = this.originalImages[latestImage.id];
+        }
+
+        if (this.isValidDataURL(dataURL)) {
+            return dataURL;
+        } else {
+            console.error('ImageLoaderPlugin: Original image is not a valid data URL.');
+            return null;
+        }
+    }
+    
     destroy() {
         if (this.uiContainer && this.uiContainer.parentNode) {
             this.uiContainer.parentNode.removeChild(this.uiContainer);
@@ -481,6 +552,5 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.canvas.requestRenderAll();
         window.removeEventListener('finalImageData', this.handleFinalImageData);
         window.removeEventListener('previewImageData', this.handlePreviewImageData);
-
     }
 }
