@@ -18,6 +18,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
 
         this.loadedImages = []; 
         this.originalImages = {};
+        this.loadedImageType = 'uploaded'; // 'uploaded' 'preview' 'final'
 
         this.onImageDrop = this.onImageDrop.bind(this);
         this.onDoubleClick = this.onDoubleClick.bind(this);
@@ -41,6 +42,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         this.canvasManager.on('image:remove', this.onImageRemove); 
         window.addEventListener('finalImageData', this.handleFinalImageData);
         window.addEventListener('previewImageData', this.handlePreviewImageData);
+
     }
 
     createUI() {
@@ -331,6 +333,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
         try {
             const dataURL = await this.readFileAsDataURL(file);
             this.loadImageFromDataURL(dataURL);
+            this.loadedImageType = 'uploaded';
         } catch (error) {
             console.error('ImageLoaderPlugin: Failed to read the image file.', error);
         }
@@ -389,6 +392,8 @@ export class ImageLoaderPlugin extends CanvasPlugin {
             lockMovementY: true,
             originX: 'center',
             originY: 'center',
+            objectCaching: false
+
         });
 
         const scaleFactor = this.updateImageScaleAndPosition(img, borderRect, canvasWidth, canvasHeight, originalWidth, originalHeight);
@@ -419,6 +424,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
             originalWidth: originalWidth,
             originalHeight: originalHeight,
             scaleFactor: scaleFactor,
+            loadedImageType: this.loadedImageType,
         });
 
         this.canvasManager.emit('image:list:updated', {
@@ -451,6 +457,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
             }
         }
 
+        this.loadedImageType = 'preview';
         this.loadImageFromDataURL(dataURL);
     }
 
@@ -471,6 +478,7 @@ export class ImageLoaderPlugin extends CanvasPlugin {
             }
         }
 
+        this.loadedImageType = 'final';
         this.loadImageFromDataURL(dataURL);
     }
 

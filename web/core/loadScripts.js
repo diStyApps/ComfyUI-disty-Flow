@@ -25,7 +25,7 @@ const loadScript = (src) => {
         script.onload = resolve;
         script.onerror = reject;
         document.head.appendChild(script);
-        console.log(`${src} loaded`);
+        // console.log(`${src} loaded`);
     });
 };
 

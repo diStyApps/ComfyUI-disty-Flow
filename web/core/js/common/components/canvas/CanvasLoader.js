@@ -273,7 +273,7 @@ export class CanvasLoader {
                 this.canvasManager.registerPlugin(imageAdderPlugin);
             }
 
-            console.log('All plugins registered successfully');
+            console.log('All canvas plugins registered successfully');
 
             this.canvasManager.on('switchView', (newView) => {
                 // console.log(`Switching viewType to: ${newView}`);

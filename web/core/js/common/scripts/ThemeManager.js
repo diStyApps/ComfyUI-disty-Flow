@@ -127,7 +127,7 @@ class ThemeManager {
         if (this.themes.length === 0) {
             console.warn('No themes found in the CSS file.');
         } else {
-            console.info(`Loaded ${this.themes.length} themes from CSS.`);
+            // console.info(`Loaded ${this.themes.length} themes from CSS.`);
         }
 
         if (!this.themes.some(t => t.value === 'create-custom')) {
@@ -190,9 +190,9 @@ class ThemeManager {
             }
 
             if (this.externalCustomThemes.length === 0) {
-                console.info('No external custom themes loaded.');
+                // console.info('No external custom themes loaded.');
             } else {
-                console.info(`Loaded ${this.externalCustomThemes.length} external custom theme styles.`);
+                // console.info(`Loaded ${this.externalCustomThemes.length} external custom theme styles.`);
             }
         } catch (error) {
             console.error('Error loading external custom themes:', error);
@@ -267,9 +267,9 @@ class ThemeManager {
             selector.setAttribute('aria-label', 'Select Theme');
 
             targetElement.appendChild(selector);
-            console.info('Theme selector dropdown created and injected.');
+            // console.info('Theme selector dropdown created and injected.');
         } else {
-            console.info('Theme selector dropdown already exists. Populating with themes.');
+            // console.info('Theme selector dropdown already exists. Populating with themes.');
             selector.innerHTML = '';
         }
 
@@ -330,7 +330,7 @@ class ThemeManager {
         selector.removeEventListener('change', this.handleThemeChange);
         selector.addEventListener('change', this.handleThemeChange.bind(this));
 
-        console.info('Theme selector dropdown populated with themes.');
+        // console.info('Theme selector dropdown populated with themes.');
     }
 
     groupThemesBySet(themes) {

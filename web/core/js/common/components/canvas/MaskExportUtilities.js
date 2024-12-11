@@ -1,24 +1,31 @@
 import { store } from '../../scripts/stateManagerMain.js';
-
 export class MaskExportUtilities {
     constructor(plugin) {
         this.plugin = plugin;
         this.isSubscribed = false;
 
         this.config = {
-            padding: 50,
-            margin: 0,
+            padding: 0, 
             resizeMask: true,
-            resizeWidth: 1024,
-            resizeHeight: 1024,
+            resizeWidth: 0,
+            resizeHeight: 0,
+            resizeDimensions: 1024,
             resizeKeepProportion: true,
-            blurMask: 25,
-            bw: true
+            blurMask: 50,
+            bw: true,
         };
+        this.config.resizeWidth = this.config.resizeDimensions;
+        this.config.resizeHeight = this.config.resizeDimensions;
+    }
+
+    setConfig(updatedConfig) {
+        this.config = { ...this.config, ...updatedConfig };
+        this.config.resizeWidth = this.config.resizeDimensions;
+        this.config.resizeHeight = this.config.resizeDimensions;
     }
 
     _getBoundingBox(canvas) {
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
         let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
@@ -38,14 +45,11 @@ export class MaskExportUtilities {
         return { minX, minY, maxX, maxY };
     }
 
-
     _addPadding(canvas, padding, touchesEdges) {
-        const { touchesLeft, touchesRight, touchesTop, touchesBottom } = touchesEdges;
-
-        const padLeft = touchesLeft ? 0 : padding / 2;
-        const padRight = touchesRight ? 0 : padding / 2;
-        const padTop = touchesTop ? 0 : padding / 2;
-        const padBottom = touchesBottom ? 0 : padding / 2;
+        const padLeft = touchesEdges.touchesLeft ? 0 : padding;
+        const padRight = touchesEdges.touchesRight ? 0 : padding;
+        const padTop = touchesEdges.touchesTop ? 0 : padding;
+        const padBottom = touchesEdges.touchesBottom ? 0 : padding;
 
         const paddedWidth = canvas.width + padLeft + padRight;
         const paddedHeight = canvas.height + padTop + padBottom;
@@ -53,7 +57,7 @@ export class MaskExportUtilities {
         const paddedCanvas = document.createElement('canvas');
         paddedCanvas.width = paddedWidth;
         paddedCanvas.height = paddedHeight;
-        const paddedCtx = paddedCanvas.getContext('2d');
+        const paddedCtx = paddedCanvas.getContext('2d', { willReadFrequently: true });
 
         paddedCtx.clearRect(0, 0, paddedWidth, paddedHeight);
         paddedCtx.drawImage(canvas, padLeft, padTop, canvas.width, canvas.height);
@@ -61,50 +65,81 @@ export class MaskExportUtilities {
         return paddedCanvas;
     }
 
-
-    _addMargin(canvas, margin, blurMask) {
-        if (margin <= 0) return canvas;
-
-        const effectiveMargin = Math.max(margin, blurMask * 2);
-        const marginWidth = canvas.width + effectiveMargin;
-        const marginHeight = canvas.height + effectiveMargin;
-
-        const marginCanvas = document.createElement('canvas');
-        marginCanvas.width = marginWidth;
-        marginCanvas.height = marginHeight;
-        const marginCtx = marginCanvas.getContext('2d');
-
-        marginCtx.clearRect(0, 0, marginWidth, marginHeight);
-        const marginOffsetX = effectiveMargin / 2;
-        const marginOffsetY = effectiveMargin / 2;
-        marginCtx.drawImage(canvas, marginOffsetX, marginOffsetY, canvas.width, canvas.height);
-
-        return marginCanvas;
-    }
-
     _resizeCanvas(canvas, targetWidth, targetHeight, keepProportion) {
         if (!this.config.resizeMask) return canvas;
 
+        const originalWidth = canvas.width;
+        const originalHeight = canvas.height;
+
+        let scaleX = targetWidth / originalWidth;
+        let scaleY = targetHeight / originalHeight;
+
         if (keepProportion) {
-            const aspectRatio = canvas.width / canvas.height;
-            if (targetWidth / targetHeight > aspectRatio) {
-                targetWidth = Math.round(targetHeight * aspectRatio);
-            } else {
-                targetHeight = Math.round(targetWidth / aspectRatio);
-            }
+            const scale = Math.min(scaleX, scaleY);
+            scaleX = scale;
+            scaleY = scale;
+            targetWidth = Math.round(originalWidth * scale);
+            targetHeight = Math.round(originalHeight * scale);
         }
 
         const resizedCanvas = document.createElement('canvas');
         resizedCanvas.width = targetWidth;
         resizedCanvas.height = targetHeight;
-        const resizedCtx = resizedCanvas.getContext('2d');
-        resizedCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
+        const resizedCtx = resizedCanvas.getContext('2d', { willReadFrequently: true });
+
+        resizedCtx.clearRect(0, 0, targetWidth, targetHeight);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = originalWidth;
+        tempCanvas.height = originalHeight;
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        tempCtx.drawImage(canvas, 0, 0);
+
+        resizedCtx.save();
+        resizedCtx.scale(scaleX, scaleY);
+        resizedCtx.drawImage(tempCanvas, 0, 0);
+        resizedCtx.restore();
 
         return resizedCanvas;
     }
 
+    _convertToAlphaMask(canvas) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const intensity = data[i]; 
+            const alpha = 255 - intensity;
+            data[i] = 0;
+            data[i + 1] = 0;
+            data[i + 2] = 0;
+            data[i + 3] = alpha;
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
+    }
+
+    _addAlphaOnImage(imageCanvas, alphaMaskCanvas) {
+        const imageCtx = imageCanvas.getContext('2d', { willReadFrequently: true });
+        const alphaCtx = alphaMaskCanvas.getContext('2d', { willReadFrequently: true });
+
+        const imageData = imageCtx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+        const maskData = alphaCtx.getImageData(0, 0, alphaMaskCanvas.width, alphaMaskCanvas.height);
+        const imgDataArr = imageData.data;
+        const maskDataArr = maskData.data;
+
+        for (let i = 0; i < imgDataArr.length; i += 4) {
+            const maskAlpha = maskDataArr[i + 3]; 
+            imgDataArr[i + 3] = Math.min(imgDataArr[i + 3], maskAlpha);
+        }
+
+        imageCtx.putImageData(imageData, 0, 0);
+        return imageCanvas;
+    }
+
     _convertToBlackAndWhite(canvas) {
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
@@ -133,7 +168,7 @@ export class MaskExportUtilities {
         const blurredCanvas = document.createElement('canvas');
         blurredCanvas.width = canvas.width;
         blurredCanvas.height = canvas.height;
-        const blurredCtx = blurredCanvas.getContext('2d');
+        const blurredCtx = blurredCanvas.getContext('2d', { willReadFrequently: true });
 
         blurredCtx.fillStyle = 'black';
         blurredCtx.fillRect(0, 0, blurredCanvas.width, blurredCanvas.height);
@@ -145,7 +180,6 @@ export class MaskExportUtilities {
         return blurredCanvas;
     }
 
-
     downloadImage(dataUrl, filename) {
         const link = document.createElement('a');
         link.href = dataUrl;
@@ -155,13 +189,10 @@ export class MaskExportUtilities {
         document.body.removeChild(link);
     }
 
-
     _processBoundingBox(canvas) {
         const { minX, minY, maxX, maxY } = this._getBoundingBox(canvas);
 
         if (maxX < minX || maxY < minY) {
-            // alert('Selected mask is completely transparent.');
-            
             return null;
         }
 
@@ -175,73 +206,127 @@ export class MaskExportUtilities {
         return { minX, minY, maxX, maxY, touchesEdges };
     }
 
-
-    exportCroppedMask(overrides = {}) {
+    exportCroppedAssets(overrides = {}) {
         const config = { ...this.config, ...overrides };
-
         if (!this.plugin.currentMask) {
-            // alert('No mask selected to export.');
+            alert('No mask selected to export.');
+            return null;
+        }
+
+        if (!this.plugin.imageObject) {
+            alert('No image loaded to export.');
             return null;
         }
 
         try {
             const maskCanvas = this.plugin.currentMask.canvasEl;
-            const boundingBox = this._processBoundingBox(maskCanvas);
-            if (!boundingBox) return null;
+            const maskBoundingBox = this._processBoundingBox(maskCanvas);
+            if (!maskBoundingBox) return null;
 
-            const { minX, minY, maxX, maxY, touchesEdges } = boundingBox;
-            let croppedWidth = maxX - minX + 1;
-            let croppedHeight = maxY - minY + 1;
-            const originalCroppedWidth = croppedWidth;
-            const originalCroppedHeight = croppedHeight;
+            const { minX, minY, maxX, maxY, touchesEdges } = maskBoundingBox;
+            const originalCroppedWidth = maxX - minX + 1;
+            const originalCroppedHeight = maxY - minY + 1;
 
-            const croppedCanvas = document.createElement('canvas');
-            croppedCanvas.width = croppedWidth;
-            croppedCanvas.height = croppedHeight;
-            const croppedCtx = croppedCanvas.getContext('2d');
-            croppedCtx.drawImage(maskCanvas, minX, minY, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
+            const croppedMaskCanvas = document.createElement('canvas');
+            croppedMaskCanvas.width = originalCroppedWidth;
+            croppedMaskCanvas.height = originalCroppedHeight;
+            const croppedMaskCtx = croppedMaskCanvas.getContext('2d', { willReadFrequently: true });
+            croppedMaskCtx.drawImage(
+                maskCanvas, 
+                minX, minY, originalCroppedWidth, originalCroppedHeight,
+                0, 0, originalCroppedWidth, originalCroppedHeight
+            );
+            
+            config.padding = (croppedMaskCanvas.width * 0.2);
+            const growMaskForFinalComposite = (croppedMaskCanvas.width * 0.1);
+            // console.log('config.padding', config.padding);
+            // console.log('(growMaskForFinalComposite',growMaskForFinalComposite);
 
+            let processedMaskCanvas = croppedMaskCanvas;
             if (config.padding > 0) {
-                const paddedCanvas = this._addPadding(croppedCanvas, config.padding, touchesEdges);
-                croppedWidth = paddedCanvas.width;
-                croppedHeight = paddedCanvas.height;
-                croppedCanvas.width = paddedCanvas.width;
-                croppedCanvas.height = paddedCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(paddedCanvas, 0, 0);
+                processedMaskCanvas = this._addPadding(croppedMaskCanvas, config.padding, touchesEdges);
             }
 
-            if (config.margin > 0) {
-                const marginCanvas = this._addMargin(croppedCanvas, config.margin, config.blurMask);
-                croppedWidth = marginCanvas.width;
-                croppedHeight = marginCanvas.height;
-                croppedCanvas.width = marginCanvas.width;
-                croppedCanvas.height = marginCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(marginCanvas, 0, 0);
-            }
+            const imageCanvas = document.createElement('canvas');
+            const imageCtx = imageCanvas.getContext('2d', { willReadFrequently: true });
+            imageCanvas.width = this.plugin.imageOriginalWidth;
+            imageCanvas.height = this.plugin.imageOriginalHeight;
+            imageCtx.drawImage(
+                this.plugin.imageObject.getElement(),
+                0,
+                0,
+                imageCanvas.width,
+                imageCanvas.height
+            );
+
+            const padLeft = touchesEdges.touchesLeft ? 0 : config.padding;
+            const padTop = touchesEdges.touchesTop ? 0 : config.padding;
+            const padRight = touchesEdges.touchesRight ? 0 : config.padding;
+            const padBottom = touchesEdges.touchesBottom ? 0 : config.padding;
+
+            const paddedMinX = Math.max(minX - padLeft, 0);
+            const paddedMinY = Math.max(minY - padTop, 0);
+            const paddedMaxX = Math.min(maxX + padRight, imageCanvas.width - 1);
+            const paddedMaxY = Math.min(maxY + padBottom, imageCanvas.height - 1);
+            const croppedImageWidth = paddedMaxX - paddedMinX + 1;
+            const croppedImageHeight = paddedMaxY - paddedMinY + 1;
+
+            const croppedImageCanvas = document.createElement('canvas');
+            croppedImageCanvas.width = croppedImageWidth;
+            croppedImageCanvas.height = croppedImageHeight;
+            const croppedImageCtx = croppedImageCanvas.getContext('2d', { willReadFrequently: true });
+            croppedImageCtx.drawImage(
+                imageCanvas,
+                paddedMinX, paddedMinY, croppedImageWidth, croppedImageHeight,
+                0, 0, croppedImageWidth, croppedImageHeight
+            );
+
+            let finalMaskCanvas = processedMaskCanvas;
+            let finalImageCanvas = croppedImageCanvas;
 
             if (config.resizeMask) {
-                const resizedCanvas = this._resizeCanvas(croppedCanvas, config.resizeWidth, config.resizeHeight, config.resizeKeepProportion);
-                croppedWidth = resizedCanvas.width;
-                croppedHeight = resizedCanvas.height;
-                croppedCanvas.width = resizedCanvas.width;
-                croppedCanvas.height = resizedCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(resizedCanvas, 0, 0);
+                finalMaskCanvas = this._resizeCanvas(
+                    processedMaskCanvas,
+                    (config.resizeWidth+config.padding),
+                    (config.resizeHeight+config.padding),
+                    config.resizeKeepProportion
+                );
+
+                finalImageCanvas = this._resizeCanvas(
+                    croppedImageCanvas,
+                    (config.resizeWidth+config.padding),
+                    (config.resizeHeight+config.padding),
+                    config.resizeKeepProportion
+                );
             }
 
             if (config.bw) {
-                this._convertToBlackAndWhite(croppedCanvas);
+                this._convertToBlackAndWhite(finalMaskCanvas);
             }
 
             if (config.blurMask > 0) {
-                const blurredCanvas = this._applyBlur(croppedCanvas, config.blurMask);
-                croppedCanvas.width = blurredCanvas.width;
-                croppedCanvas.height = blurredCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(blurredCanvas, 0, 0);
+                finalMaskCanvas = this._applyBlur(finalMaskCanvas, config.blurMask);
             }
+
+            const alphaMaskCanvas = document.createElement('canvas');
+            alphaMaskCanvas.width = finalMaskCanvas.width;
+            alphaMaskCanvas.height = finalMaskCanvas.height;
+            const alphaMaskCtx = alphaMaskCanvas.getContext('2d', { willReadFrequently: true });
+            alphaMaskCtx.drawImage(finalMaskCanvas, 0, 0);
+
+            this._convertToAlphaMask(alphaMaskCanvas);
+
+            const alphaOnImageCanvas = document.createElement('canvas');
+            alphaOnImageCanvas.width = finalImageCanvas.width;
+            alphaOnImageCanvas.height = finalImageCanvas.height;
+            const alphaOnImageCtx = alphaOnImageCanvas.getContext('2d', { willReadFrequently: true });
+            alphaOnImageCtx.drawImage(finalImageCanvas, 0, 0);
+            this._addAlphaOnImage(alphaOnImageCanvas, alphaMaskCanvas);
+
+            const maskDataURL = finalMaskCanvas.toDataURL('image/png');
+            const imageDataURL = finalImageCanvas.toDataURL('image/png');
+            const alphaMaskDataURL = alphaMaskCanvas.toDataURL('image/png');
+            const alphaOnImageDataURL = alphaOnImageCanvas.toDataURL('image/png');
 
             const croppedImage = {
                 loadedImage: {
@@ -249,39 +334,47 @@ export class MaskExportUtilities {
                     height: this.plugin.imageOriginalHeight
                 },
                 mask: {
-                    x: minX,
-                    y: minY,
-                    width: originalCroppedWidth,
-                    height: originalCroppedHeight,
-                    resizePaddingWidth: croppedWidth,
-                    resizePaddingHeight: croppedHeight
+                    x: paddedMinX,
+                    y: paddedMinY,
+                    width: croppedImageWidth,
+                    height: croppedImageHeight,
+                    resizePaddingWidth: finalImageCanvas.width,
+                    resizePaddingHeight: finalImageCanvas.height,
+                    growMaskForFinalComposite: growMaskForFinalComposite
                 },
             };
+            
             store.dispatch({
                 type: 'SET_CROPPED_IMAGE',
                 payload: croppedImage
             });
 
-            return croppedCanvas.toDataURL('image/png');
+            return { 
+                mask: maskDataURL, 
+                image: imageDataURL,
+                alphaMask: alphaMaskDataURL,
+                alphaOnimage: alphaOnImageDataURL
+            };
 
         } catch (error) {
-            console.error('Error exporting cropped mask:', error);
-            alert('An error occurred while exporting the cropped mask.');
+            console.error('Error exporting cropped assets:', error);
+            alert('An error occurred while exporting the cropped assets.');
             return null;
         }
     }
 
+    exportCroppedMask(overrides = {}) {
+        const assets = this.exportCroppedAssets(overrides);
+        return assets ? assets.mask : null;
+    }
 
     saveCroppedMask(overrides = {}) {
-        const config = { ...this.config, ...overrides };
-        const dataURL = this.exportCroppedMask(overrides);
-        if (dataURL) {
+        const assets = this.exportCroppedAssets(overrides);
+        if (assets && assets.mask) {
+            const config = { ...this.config, ...overrides };
             const filenameParts = [`${this.plugin.currentMask.name}_cropped`];
             if (config.padding > 0) {
                 filenameParts.push(`padded_${config.padding}`);
-            }
-            if (config.margin > 0) {
-                filenameParts.push(`margin_${config.margin}`);
             }
             if (config.resizeMask) {
                 const proportion = config.resizeKeepProportion ? '_proportional' : '';
@@ -294,309 +387,20 @@ export class MaskExportUtilities {
                 filenameParts.push(`bw_${config.bw}`);
             }
             const filename = `${filenameParts.join('_')}.png`;
-            this.downloadImage(dataURL, filename);
+            this.downloadImage(assets.mask, filename);
         }
     }
 
-
     exportCroppedImage(overrides = {}) {
-        const config = { 
-            padding: 0, 
-            resizeMask: true, 
-            resizeWidth: 1024, 
-            resizeHeight: 1024, 
-            resizeKeepProportion: true,
-            ...overrides 
-        };
-
-        if (!this.plugin.imageObject) {
-            alert('No image loaded to export.');
-            return null;
-        }
-
-        if (!this.plugin.currentMask) {
-            alert('No mask selected to guide the cropping.');
-            return null;
-        }
-
-        try {
-            const imageCanvas = document.createElement('canvas');
-            const imageCtx = imageCanvas.getContext('2d');
-            imageCanvas.width = this.plugin.imageOriginalWidth;
-            imageCanvas.height = this.plugin.imageOriginalHeight;
-            imageCtx.drawImage(
-                this.plugin.imageObject.getElement(),
-                0,
-                0,
-                imageCanvas.width,
-                imageCanvas.height
-            );
-
-            const maskCanvas = this.plugin.currentMask.canvasEl;
-            const boundingBox = this._processBoundingBox(maskCanvas);
-            if (!boundingBox) return null;
-
-            const { minX, minY, maxX, maxY } = boundingBox;
-            let croppedWidth = maxX - minX + 1;
-            let croppedHeight = maxY - minY + 1;
-
-            const croppedCanvas = document.createElement('canvas');
-            croppedCanvas.width = croppedWidth;
-            croppedCanvas.height = croppedHeight;
-            const croppedCtx = croppedCanvas.getContext('2d');
-            croppedCtx.drawImage(
-                imageCanvas,
-                minX,
-                minY,
-                croppedWidth,
-                croppedHeight,
-                0,
-                0,
-                croppedWidth,
-                croppedHeight
-            );
-
-            if (config.padding > 0) {
-                const paddedCanvas = document.createElement('canvas');
-                paddedCanvas.width = croppedWidth + config.padding;
-                paddedCanvas.height = croppedHeight + config.padding;
-                const paddedCtx = paddedCanvas.getContext('2d');
-
-                paddedCtx.clearRect(0, 0, paddedCanvas.width, paddedCanvas.height);
-                const offsetX = config.padding / 2;
-                const offsetY = config.padding / 2;
-                paddedCtx.drawImage(
-                    croppedCanvas,
-                    offsetX,
-                    offsetY,
-                    croppedWidth,
-                    croppedHeight
-                );
-
-                croppedCanvas.width = paddedCanvas.width;
-                croppedCanvas.height = paddedCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(paddedCanvas, 0, 0);
-                croppedWidth = paddedCanvas.width;
-                croppedHeight = paddedCanvas.height;
-            }
-
-            if (config.resizeMask) {
-                const resizedCanvas = this._resizeCanvas(croppedCanvas, config.resizeWidth, config.resizeHeight, config.resizeKeepProportion);
-                croppedCanvas.width = resizedCanvas.width;
-                croppedCanvas.height = resizedCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(resizedCanvas, 0, 0);
-                croppedWidth = resizedCanvas.width;
-                croppedHeight = resizedCanvas.height;
-            }
-
-            return croppedCanvas.toDataURL('image/png');
-
-        } catch (error) {
-            console.error('Error exporting cropped image:', error);
-            alert('An error occurred while exporting the cropped image.');
-            return null;
-        }
+        const assets = this.exportCroppedAssets(overrides);
+        return assets ? assets.image : null;
     }
 
     saveCroppedImage(overrides = {}) {
-        const config = { 
-            padding: 0, 
-            resizeMask: true, 
-            resizeWidth: 1024, 
-            resizeHeight: 1024, 
-            resizeKeepProportion: true,
-            ...overrides 
-        };
-        const dataURL = this.exportCroppedImage(overrides);
-        if (dataURL) {
+        const assets = this.exportCroppedAssets(overrides);
+        if (assets && assets.image) {
+            const config = { ...this.config, ...overrides };
             const filenameParts = [`${this.plugin.imageObject.name}_cropped`];
-            if (config.padding > 0) {
-                filenameParts.push(`padded_${config.padding}`);
-            }
-            if (config.resizeMask) {
-                const proportion = config.resizeKeepProportion ? '_proportional' : '';
-                filenameParts.push(`resized_${config.resizeWidth}x${config.resizeHeight}${proportion}`);
-            }
-            const filename = `${filenameParts.join('_')}.png`;
-            this.downloadImage(dataURL, filename);
-        }
-    }
-
-    exportCroppedAlphaOnImage(overrides = {}) {
-        const config = { 
-            padding: 50, 
-            resizeMask: true, 
-            resizeWidth: 1024, 
-            resizeHeight: 1024, 
-            resizeKeepProportion: true, 
-            blurMask: 25,
-            ...overrides 
-        };
-
-        if (!this.plugin.imageObject) {
-            alert('No image loaded to export.');
-            return null;
-        }
-
-        if (!this.plugin.currentMask) {
-            alert('No mask selected to guide the cropping.');
-            return null;
-        }
-
-        try {
-            const imageCanvas = document.createElement('canvas');
-            const imageCtx = imageCanvas.getContext('2d');
-            imageCanvas.width = this.plugin.imageOriginalWidth;
-            imageCanvas.height = this.plugin.imageOriginalHeight;
-            imageCtx.drawImage(
-                this.plugin.imageObject.getElement(),
-                0,
-                0,
-                imageCanvas.width,
-                imageCanvas.height
-            );
-
-            const maskCanvas = this.plugin.currentMask.canvasEl;
-            const boundingBox = this._processBoundingBox(maskCanvas);
-            if (!boundingBox) return null;
-
-            const { minX, minY, maxX, maxY } = boundingBox;
-            const originalCroppedWidth = maxX - minX + 1;
-            const originalCroppedHeight = maxY - minY + 1;
-
-            const croppedCanvas = document.createElement('canvas');
-            croppedCanvas.width = originalCroppedWidth;
-            croppedCanvas.height = originalCroppedHeight;
-            const croppedCtx = croppedCanvas.getContext('2d');
-            croppedCtx.drawImage(
-                imageCanvas,
-                minX,
-                minY,
-                originalCroppedWidth,
-                originalCroppedHeight,
-                0,
-                0,
-                originalCroppedWidth,
-                originalCroppedHeight
-            );
-
-            if (config.padding > 0) {
-                const paddedCanvas = document.createElement('canvas');
-                paddedCanvas.width = originalCroppedWidth + config.padding;
-                paddedCanvas.height = originalCroppedHeight + config.padding;
-                const paddedCtx = paddedCanvas.getContext('2d');
-
-                paddedCtx.clearRect(0, 0, paddedCanvas.width, paddedCanvas.height);
-                const offsetX = config.padding / 2;
-                const offsetY = config.padding / 2;
-                paddedCtx.drawImage(
-                    croppedCanvas,
-                    offsetX,
-                    offsetY,
-                    originalCroppedWidth,
-                    originalCroppedHeight
-                );
-
-                croppedCanvas.width = paddedCanvas.width;
-                croppedCanvas.height = paddedCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(paddedCanvas, 0, 0);
-            }
-
-            const scaleXOriginal = croppedCanvas.width;
-            const scaleYOriginal = croppedCanvas.height;
-
-            if (config.resizeMask) {
-                const resizedCanvas = this._resizeCanvas(croppedCanvas, config.resizeWidth, config.resizeHeight, config.resizeKeepProportion);
-                croppedCanvas.width = resizedCanvas.width;
-                croppedCanvas.height = resizedCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(resizedCanvas, 0, 0);
-            }
-
-            const tempMaskCanvas = document.createElement('canvas');
-            tempMaskCanvas.width = croppedCanvas.width;
-            tempMaskCanvas.height = croppedCanvas.height;
-            const tempMaskCtx = tempMaskCanvas.getContext('2d');
-            tempMaskCtx.drawImage(
-                maskCanvas,
-                minX,
-                minY,
-                originalCroppedWidth,
-                originalCroppedHeight,
-                0,
-                0,
-                croppedCanvas.width,
-                croppedCanvas.height
-            );
-
-            const tempMaskImageData = tempMaskCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
-            const tempMaskData = tempMaskImageData.data;
-
-            const croppedImageData = croppedCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
-            const croppedData = croppedImageData.data;
-
-            for (let i = 0; i < croppedData.length; i += 4) {
-                const maskAlpha = tempMaskData[i + 3];
-                // Invert the alpha: 255 - maskAlpha
-                croppedData[i + 3] = 255 - maskAlpha;
-            }
-
-            croppedCtx.putImageData(croppedImageData, 0, 0);
-
-            if (config.blurMask > 0) {
-                const blurredCanvas = this._applyBlur(croppedCanvas, config.blurMask);
-                croppedCanvas.width = blurredCanvas.width;
-                croppedCanvas.height = blurredCanvas.height;
-                croppedCtx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
-                croppedCtx.drawImage(blurredCanvas, 0, 0);
-            }
-
-            const finalCroppedWidth = croppedCanvas.width;
-            const finalCroppedHeight = croppedCanvas.height;
-            const croppedImage = {
-                loadedImage: {
-                    width: imageCanvas.width,
-                    height: imageCanvas.height
-                },
-                mask: {
-                    x: minX,
-                    y: minY,
-                    width: originalCroppedWidth,
-                    height: originalCroppedHeight,
-                    resizePaddingWidth: finalCroppedWidth,
-                    resizePaddingHeight: finalCroppedHeight
-                },
-            };
-            store.dispatch({
-                type: 'SET_CROPPED_IMAGE',
-                payload: croppedImage
-            });
-
-            return croppedCanvas.toDataURL('image/png');
-
-        } catch (error) {
-            console.error('Error exporting cropped alpha on image:', error);
-            alert('An error occurred while exporting the cropped alpha on image.');
-            return null;
-        }
-    }
-
-    saveCroppedAlphaOnImage(overrides = {}) {
-        const config = { 
-            padding: 50, 
-            resizeMask: true, 
-            resizeWidth: 1024, 
-            resizeHeight: 1024, 
-            resizeKeepProportion: true, 
-            blurMask: 25,
-            ...overrides 
-        };
-        const dataURL = this.exportCroppedAlphaOnImage(overrides);
-        if (dataURL) {
-            const filenameParts = [`${this.plugin.imageObject.name}_cropped_alpha_on_image`];
             if (config.padding > 0) {
                 filenameParts.push(`padded_${config.padding}`);
             }
@@ -607,16 +411,76 @@ export class MaskExportUtilities {
             if (config.blurMask > 0) {
                 filenameParts.push(`blurred_${config.blurMask}`);
             }
+            if (config.bw) {
+                filenameParts.push(`bw_${config.bw}`);
+            }
             const filename = `${filenameParts.join('_')}.png`;
-            this.downloadImage(dataURL, filename);
+            this.downloadImage(assets.image, filename);
         }
     }
 
+    exportCroppedAlphaOnImage(overrides = {}) {
+        const assets = this.exportCroppedAssets(overrides);
+        return assets ? assets.alphaOnimage : null;    
+    }
+
+    saveCroppedAlphaOnImage(overrides = {}) {
+        const assets = this.exportCroppedAssets(overrides);
+        if (assets && assets.alphaOnimage) {
+            const config = { ...this.config, ...overrides };
+            const filenameParts = [`${this.plugin.imageObject.name}_cropped_alphaOnImage`];
+            if (config.padding > 0) {
+                filenameParts.push(`padded_${config.padding}`);
+            }
+            if (config.resizeMask) {
+                const proportion = config.resizeKeepProportion ? '_proportional' : '';
+                filenameParts.push(`resized_${config.resizeWidth}x${config.resizeHeight}${proportion}`);
+            }
+            if (config.blurMask > 0) {
+                filenameParts.push(`blurred_${config.blurMask}`);
+            }
+            if (config.bw) {
+                filenameParts.push(`bw_${config.bw}`);
+            }
+            const filename = `${filenameParts.join('_')}.png`;
+            this.downloadImage(assets.alphaOnimage, filename);
+        }
+    }
+
+    exportCroppedAlphaMask(overrides = {}) {
+        const assets = this.exportCroppedAssets(overrides);
+        return assets ? assets.alphaMask : null;    
+    }
+
+    saveCroppedAlphaMask(overrides = {}) {
+        const assets = this.exportCroppedAssets(overrides);
+        if (assets && assets.alphaMask) {
+            const config = { ...this.config, ...overrides };
+            const filenameParts = [`${this.plugin.currentMask.name}_cropped_alphaMask`];
+            if (config.padding > 0) {
+                filenameParts.push(`padded_${config.padding}`);
+            }
+            if (config.resizeMask) {
+                const proportion = config.resizeKeepProportion ? '_proportional' : '';
+                filenameParts.push(`resized_${config.resizeWidth}x${config.resizeHeight}${proportion}`);
+            }
+            if (config.blurMask > 0) {
+                filenameParts.push(`blurred_${config.blurMask}`);
+            }
+            if (config.bw) {
+                filenameParts.push(`bw_${config.bw}`);
+            }
+            const filename = `${filenameParts.join('_')}.png`;
+            this.downloadImage(assets.alphaMask, filename);
+        }
+    }
+
+    // old
     createCombinedAlphaMask() {
         const alphaCanvas = document.createElement('canvas');
         alphaCanvas.width = this.plugin.imageOriginalWidth;
         alphaCanvas.height = this.plugin.imageOriginalHeight;
-        const alphaCtx = alphaCanvas.getContext('2d');
+        const alphaCtx = alphaCanvas.getContext('2d', { willReadFrequently: true });
 
         alphaCtx.clearRect(0, 0, alphaCanvas.width, alphaCanvas.height);
         this.plugin.masks.forEach(mask => {
@@ -641,14 +505,14 @@ export class MaskExportUtilities {
             const combinedCanvas = document.createElement('canvas');
             combinedCanvas.width = this.plugin.imageOriginalWidth;
             combinedCanvas.height = this.plugin.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
+            const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
             combinedCtx.drawImage(this.plugin.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
 
             const alphaMask = document.createElement('canvas');
             alphaMask.width = this.plugin.imageOriginalWidth;
             alphaMask.height = this.plugin.imageOriginalHeight;
-            const alphaCtx = alphaMask.getContext('2d');
+            const alphaCtx = alphaMask.getContext('2d', { willReadFrequently: true });
             alphaCtx.drawImage(this.plugin.currentMask.canvasEl, 0, 0, alphaMask.width, alphaMask.height);
 
             combinedCtx.globalCompositeOperation = 'destination-out';
@@ -664,7 +528,6 @@ export class MaskExportUtilities {
             return null;
         }
     }
-
 
     exportAllMasksAlphaOnImage() {
         if (!this.plugin.imageObject) {
@@ -682,14 +545,14 @@ export class MaskExportUtilities {
                 const combinedCanvas = document.createElement('canvas');
                 combinedCanvas.width = this.plugin.imageOriginalWidth;
                 combinedCanvas.height = this.plugin.imageOriginalHeight;
-                const combinedCtx = combinedCanvas.getContext('2d');
+                const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
                 combinedCtx.drawImage(this.plugin.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
 
                 const alphaMask = document.createElement('canvas');
                 alphaMask.width = this.plugin.imageOriginalWidth;
                 alphaMask.height = this.plugin.imageOriginalHeight;
-                const alphaCtx = alphaMask.getContext('2d');
+                const alphaCtx = alphaMask.getContext('2d', { willReadFrequently: true });
                 alphaCtx.drawImage(mask.canvasEl, 0, 0, alphaMask.width, alphaMask.height);
 
                 combinedCtx.globalCompositeOperation = 'destination-out';
@@ -726,7 +589,7 @@ export class MaskExportUtilities {
             const combinedCanvas = document.createElement('canvas');
             combinedCanvas.width = this.plugin.imageOriginalWidth;
             combinedCanvas.height = this.plugin.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
+            const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
             combinedCtx.drawImage(this.plugin.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
 
@@ -777,7 +640,7 @@ export class MaskExportUtilities {
             const combinedCanvas = document.createElement('canvas');
             combinedCanvas.width = this.plugin.imageOriginalWidth;
             combinedCanvas.height = this.plugin.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
+            const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
             combinedCtx.drawImage(this.plugin.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
 
@@ -804,7 +667,7 @@ export class MaskExportUtilities {
             const combinedCanvas = document.createElement('canvas');
             combinedCanvas.width = this.plugin.imageOriginalWidth;
             combinedCanvas.height = this.plugin.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
+            const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
             this.plugin.masks.forEach(mask => {
                 combinedCtx.drawImage(mask.canvasEl, 0, 0, combinedCanvas.width, combinedCanvas.height);
@@ -829,7 +692,7 @@ export class MaskExportUtilities {
             const combinedCanvas = document.createElement('canvas');
             combinedCanvas.width = this.plugin.imageOriginalWidth;
             combinedCanvas.height = this.plugin.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
+            const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
             combinedCtx.fillStyle = 'black';
             combinedCtx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
@@ -838,7 +701,7 @@ export class MaskExportUtilities {
                 const maskCanvas = document.createElement('canvas');
                 maskCanvas.width = this.plugin.imageOriginalWidth;
                 maskCanvas.height = this.plugin.imageOriginalHeight;
-                const maskCtx = maskCanvas.getContext('2d');
+                const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
 
                 maskCtx.drawImage(mask.canvasEl, 0, 0, maskCanvas.width, maskCanvas.height);
 
@@ -848,9 +711,9 @@ export class MaskExportUtilities {
                 for (let i = 0; i < data.length; i += 4) {
                     const alpha = data[i + 3];
                     if (alpha > 0) {
-                        data[i] = 255;     // Red
-                        data[i + 1] = 255; // Green
-                        data[i + 2] = 255; // Blue
+                        data[i] = 255;     
+                        data[i + 1] = 255; 
+                        data[i + 2] = 255;
                     }
                 }
 
@@ -883,7 +746,7 @@ export class MaskExportUtilities {
             const combinedCanvas = document.createElement('canvas');
             combinedCanvas.width = this.plugin.imageOriginalWidth;
             combinedCanvas.height = this.plugin.imageOriginalHeight;
-            const combinedCtx = combinedCanvas.getContext('2d');
+            const combinedCtx = combinedCanvas.getContext('2d', { willReadFrequently: true });
 
             combinedCtx.drawImage(this.plugin.imageObject.getElement(), 0, 0, combinedCanvas.width, combinedCanvas.height);
             combinedCtx.drawImage(this.plugin.currentMask.canvasEl, 0, 0, combinedCanvas.width, combinedCanvas.height);

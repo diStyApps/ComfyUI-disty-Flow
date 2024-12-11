@@ -78,6 +78,8 @@ class StateManager {
                 return { ...state, croppedImage: action.payload };
             case 'SET_MASKING_TYPE':
                 return { ...state, maskingType: action.payload };
+            case 'SET_QUEUE_RUNNING':
+                return { ...state, isQueueRunning: action.payload };
             case 'RESET_STATE':
                 return this.constructor.initialState;
             default:
@@ -116,4 +118,5 @@ export const store = new StateManager({
     hideMask:false,
     croppedImage: {},
     maskingType: 'full', // Possible values: 'full', 'cropped'
+    isQueueRunning: false,
 });

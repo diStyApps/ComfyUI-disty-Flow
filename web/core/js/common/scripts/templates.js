@@ -710,7 +710,34 @@ const componentTemplates = {
             }
         }
     },
+
     UNETLoader: {
+        type: 'components',
+        nodeClass: 'UNETLoader',
+        components: [
+            {
+                type: 'dropdown',
+                params: {
+                    label: 'Model',
+                    nodePath: '{nodeId}.inputs.unet_name',
+                    key: 'unet_name',
+                    url: 'UNETLoader'
+                
+                },
+            },
+            {
+                type: 'dropdown',
+                params: {
+                    label: 'Type',
+                    nodePath: '{nodeId}.inputs.weight_dtype',
+                    key: 'weight_dtype',
+                    url: 'UNETLoader',
+                },
+            },
+        ],
+    },
+
+    UnetLoaderGGUF: {
         type: 'component',
         nodeClass: null,
         component: {
@@ -719,7 +746,7 @@ const componentTemplates = {
                 label: 'Model',
                 nodePath: '{nodeId}.inputs.unet_name',
                 key: 'unet_name',
-                url: 'UNETLoader'
+                url: 'UnetLoaderGGUF'
             }
         }
     },
@@ -837,5 +864,65 @@ const componentTemplates = {
             },
         ],
     },
+    GrowMask_Expand: {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'dataComponent',
+            params: {
+                name: 'growMaskForFinalComposite',
+                nodePath: '228.inputs.expand',
+                dataPath: 'croppedImage.mask.growMaskForFinalComposite',
+            }
+        }
+    },
+    ImageCompositeMasked_X: {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'dataComponent',
+            params: {
+                name: 'croppedImageMmaskX',
+                nodePath: '201.inputs.x',
+                dataPath: 'croppedImage.mask.x',
+            }
+        }
+    },
+    ImageCompositeMasked_Y: {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'dataComponent',
+            params: {
+                name: 'croppedImageMmaskY',
+                nodePath: '201.inputs.y',
+                dataPath: 'croppedImage.mask.y',
+            }
+        }
+    },
+    ImageCompositeMasked_Width: {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'dataComponent',
+            params: {
+                name: 'croppedImageMmaskWidth',
+                nodePath: '225.inputs.width',
+                dataPath: 'croppedImage.mask.width',
+            }
+        }
+    },    
+    ImageCompositeMasked_Height: {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'dataComponent',
+            params: {
+                name: 'croppedImageMmaskHeight',
+                nodePath: '225.inputs.height',
+                dataPath: 'croppedImage.mask.height',
+            }
+        }
+    },    
 };
 export { componentTemplates };

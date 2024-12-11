@@ -3,6 +3,7 @@ import WorkflowNodeAdder from './WorkflowNodeAdder.js';
 import DropdownStepper from './DropdownStepper.js';
 
 class LoraWorkflowManager {
+
     constructor(workflow, flowConfig) {
         this.workflowManager = new WorkflowNodeAdder(workflow);
         this.flowConfig = flowConfig;
@@ -14,26 +15,33 @@ class LoraWorkflowManager {
     initializeUI() {
         this.addButton = document.createElement('button');
         this.addButton.textContent = '+LoRA';
-        this.addButton.classList.add('add-lora-button'); 
+        this.addButton.classList.add('add-lora-button');
         this.addButton.style.marginBottom = '5px';
-        this.container.appendChild(this.addButton); 
+        this.container.appendChild(this.addButton);
         this.addButton.addEventListener('click', () => this.handleAddLora());
     }
 
     handleAddLora() {
         try {
-            const newNodeId = this.workflowManager.addLora();
+            const modelLoaders = this.workflowManager._findModelLoaders();
+            if (modelLoaders.length === 0) {
+                throw new Error('No model loader found in the workflow to attach LoRA.');
+            }
+            const targetModelLoader = modelLoaders[0];
+            const newNodeId = this.workflowManager.addLora(targetModelLoader.id);
+            const updatedWorkflow = this.workflowManager.getWorkflow();
 
             const dynamicConfig = this.createDynamicConfig(newNodeId);
-
             const loraContainer = document.createElement('div');
             loraContainer.id = dynamicConfig.id;
             loraContainer.classList.add('dropdown-stepper-container');
             this.container.appendChild(loraContainer);
-            new DropdownStepper(dynamicConfig, this.workflowManager.getWorkflow());
+            new DropdownStepper(dynamicConfig, updatedWorkflow);
 
+            // console.log(`LoRA node ${newNodeId} added successfully to model loader ${targetModelLoader.id}.`);
         } catch (error) {
             console.error('Error adding LoRA:', error);
+            alert(`Failed to add LoRA: ${error.message}`);
         }
     }
 
@@ -62,9 +70,9 @@ class LoraWorkflowManager {
             ]
         };
     }
-
     getWorkflow() {
         return this.workflowManager.getWorkflow();
     }
 }
+
 export default LoraWorkflowManager;

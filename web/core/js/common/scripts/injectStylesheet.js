@@ -16,7 +16,7 @@ function injectStylesheet(href, id = null) {
     link.onload = function() {
         this.onload = null;
         this.rel = 'stylesheet';
-        console.log(`Stylesheet "${href}" has been loaded and applied.`);
+        // console.log(`Stylesheet "${href}" has been loaded and applied.`);
     };
 
     link.onerror = function() {

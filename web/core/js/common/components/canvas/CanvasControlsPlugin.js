@@ -1,5 +1,4 @@
 import { CanvasPlugin } from './CanvasPlugin.js';
-
 export class CanvasControlsPlugin extends CanvasPlugin {
     constructor(options = {}) {
         super('CanvasControlsPlugin');
@@ -239,7 +238,9 @@ export class CanvasControlsPlugin extends CanvasPlugin {
             const evt = opt.e;
             this.lastPosX = evt.clientX;
             this.lastPosY = evt.clientY;
-            this.canvas.setCursor('grabbing');
+            // this.canvas.setCursor(`url(${this.getPanIcon()}), auto`);
+            this.canvas.setCursor('move');
+
             evt.preventDefault();
             evt.stopPropagation();
         }
@@ -272,28 +273,27 @@ export class CanvasControlsPlugin extends CanvasPlugin {
             this.canvas.requestRenderAll();
             this.lastPosX = e.clientX;
             this.lastPosY = e.clientY;
+            this.canvas.setCursor('move');
+            // this.canvas.setCursor(`url(${this.getPanIcon()}), auto`);
         }
+
     }
 
     onMouseUp(opt) {
         if (this.isPanning) {
             this.isPanning = false;
-            this.canvas.setCursor(this.isPanMode || this.isAltPan ? 'grab' : 'default');
+            this.canvas.setCursor(this.isPanMode || this.isAltPan ? 'default' : 'default');
         }
     }
     togglePanMode() {
         this.isPanMode = !this.isPanMode;
         this.updatePanButtonState();
-        this.canvasManager.emit('pan:toggled');
-
-        // if (this.isPanMode) {
-        //     this.canvas.setCursor('grab');
-        //     this.canvasManager.emit('pan:activated');
-
-        // } else {
-        //     this.canvas.setCursor('default');
-        //     this.canvasManager.emit('pan:deactivated');
-        // }
+        // this.canvasManager.emit('pan:toggled');
+        if (this.isPanMode) {
+            this.canvasManager.emit('pan:activated');
+        } else {
+            // this.canvasManager.emit('pan:deactivated');
+        }
     }
     
     zoomIn() {
@@ -301,6 +301,7 @@ export class CanvasControlsPlugin extends CanvasPlugin {
         zoom *= 1.1;
         if (zoom > 20) zoom = 20;
         this.canvas.zoomToPoint({ x: this.canvas.width / 2, y: this.canvas.height / 2 }, zoom);
+
     }
 
     zoomOut() {
@@ -314,19 +315,22 @@ export class CanvasControlsPlugin extends CanvasPlugin {
         this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     }
 
-
     zoom(e,delta) {
         let zoom = this.canvas.getZoom();
         zoom *= 0.999 ** delta;
         if (zoom > 20) zoom = 20;
         if (zoom < 0.1) zoom = 0.1;
         this.canvas.zoomToPoint({ x: e.offsetX, y: e.offsetY }, zoom);
-        // this.canvasManager.emit('zoom:changed', { zoom });                    
+        if (delta > 0) {
+            this.canvas.setCursor('zoom-out');
+        } else {
+            this.canvas.setCursor('zoom-in');
+        }
     }
 
     horizontalPan(delta) {
         const vpt = this.canvas.viewportTransform;
-        const panDelta = delta / 10; // Adjust pan speed as necessary
+        const panDelta = delta / 10; 
         vpt[4] += panDelta;
         this.canvas.requestRenderAll();
         // this.canvasManager.emit('pan:changed', { x: vpt[4], y: vpt[5] });
@@ -334,7 +338,7 @@ export class CanvasControlsPlugin extends CanvasPlugin {
 
     verticalPan(delta) {
         const vpt = this.canvas.viewportTransform;
-        const panDelta = delta / 10; // Adjust pan speed as necessary
+        const panDelta = delta / 10;
         vpt[5] += panDelta;
         this.canvas.requestRenderAll();
         // this.canvasManager.emit('pan:changed', { x: vpt[4], y: vpt[5] });        
@@ -497,6 +501,16 @@ export class CanvasControlsPlugin extends CanvasPlugin {
     `;
     }
 
+    getPanIcon() {
+        const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 4h16v16H4V4zM12 4v16" />
+            </svg>
+        `;
+        // Convert the SVG to a Data URI
+        return `data:image/svg+xml;base64,${btoa(svg)}`;
+    }
+    
 }
 
 

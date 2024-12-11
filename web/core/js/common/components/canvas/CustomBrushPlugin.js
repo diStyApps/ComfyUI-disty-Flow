@@ -10,7 +10,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.maxBrushSize = options.maxBrushSize || 500;
         this.brushColor = options.brushColor || '#000000';
         this.brushOpacity = options.brushOpacity !== undefined ? options.brushOpacity : 1;
-        this.brushTipResizeSpeed = options.brushTipResizeSpeed || 1;
+        this.brushTipResizeSpeed = options.brushTipResizeSpeed || 10;
         this.cursorOutlineType = options.cursorOutlineType || 'dashed';
         this.cursorPrimaryColor = options.cursorPrimaryColor || '#000000';
         this.cursorSecondaryColor = options.cursorSecondaryColor || '#FFFFFF';
@@ -28,7 +28,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.isMouseDown = false;
         this.lastPointer = null;
         this.isMouseOverCanvas = false;
-
+        this.cursorText = null;
         this.currentPath = null;
         this.brushIcon = '/core/media/ui/paintree.png';
 
@@ -82,6 +82,12 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.enableDrawingMode = this.enableDrawingMode.bind(this);
         this.onCanvasPointerEnter = this.onCanvasPointerEnter.bind(this);
         this.onCanvasPointerLeave = this.onCanvasPointerLeave.bind(this);
+
+        store.subscribe((state) => {
+            if (state.isQueueRunning) {
+                this.disableDrawingMode();
+            }
+        });
     }
 
     init(canvasManager) {
@@ -96,13 +102,6 @@ export class CustomBrushPlugin extends CanvasPlugin {
 
         this.createUI();
 
-        // if (this.canvasElement) {
-        //     if (this.canvasElement.tagName.toLowerCase() === 'canvas' && !this.canvasElement.hasAttribute('tabindex')) {
-        //         this.canvasElement.setAttribute('tabindex', '0');
-        //         // console.log('Set tabindex="0" on the canvas element to make it focusable.');
-        //     }
-        // }
-
         this.attachEventListeners();
 
         this.brushSizeInput.value = this.brushSize;
@@ -114,7 +113,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.canvas.getObjects().forEach(this.enforceObjectProperties);
 
         this.canvasManager.on('viewport:changed', this.onViewportChanged);
-        this.canvasManager.on('pan:toggled', this.disableDrawingMode);
+        this.canvasManager.on('pan:activated', this.disableDrawingMode);
     }
 
     injectHiddenCursorCSS() {
@@ -129,9 +128,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         document.head.appendChild(style);
     }
 
-    // Helper function to convert HEX to RGBA
     getFillColorWithOpacity(hex, alpha) {
-        // Remove '#' if present
         hex = hex.replace('#', '');
         let r, g, b;
         if (hex.length === 3) {
@@ -143,7 +140,6 @@ export class CustomBrushPlugin extends CanvasPlugin {
             g = parseInt(hex.substring(2, 4), 16);
             b = parseInt(hex.substring(4, 6), 16);
         } else {
-            // Invalid format
             return 'rgba(0,0,0,1)';
         }
         return `rgba(${r},${g},${b},${alpha})`;
@@ -249,7 +245,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
     }
 
     onCanvasPointerLeave(e) {
-        if (!this.isMouseOverCanvas) return; // Prevent redundant processing
+        if (!this.isMouseOverCanvas) return;
         this.isMouseOverCanvas = false;
 
         if (this.canvasElement && typeof this.canvasElement.blur === 'function') {
@@ -282,15 +278,9 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 // console.log(`Brush disabled via ${key} key press.`);
             }
         }
-
-        switch (key) {
-            case 'd':
-                this.onToggleDrawingMode();
-                break;                  
-            default:
-                break;
+        if (key === 'd' || key === 'D' || key === 'm' || key === 'M') {
+            this.onToggleDrawingMode();
         }
-
         if (this.isMouseOverCanvas) {
             e.preventDefault();
         }
@@ -311,7 +301,6 @@ export class CustomBrushPlugin extends CanvasPlugin {
         }
     }
     
-
     disableSelectionBox() {
         this.canvas.selection = false;
         this.canvas.selectionColor = 'transparent';
@@ -347,6 +336,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.attachDrawingEvents();
         this.updateCursorCircle();
         this.canvas.requestRenderAll();
+        this.canvasManager.emit('brush:activated');
+
     }
 
     disableDrawingMode() {
@@ -360,6 +351,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.configureCanvasObjects(false);
         this.detachDrawingEvents();
         this.removeCursorCircles();
+        this.canvasManager.emit('brush:deactivated');
     }
     
     updateToggleButton(isActive) {
@@ -405,10 +397,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
     onToggleDrawingMode() {
         if (!this.drawingMode) {
             this.enableDrawingMode();
-            this.canvasManager.emit('brush:activated');
         } else {
             this.disableDrawingMode();
-            this.canvasManager.emit('brush:deactivated');
         }
     }
 
@@ -491,121 +481,11 @@ export class CustomBrushPlugin extends CanvasPlugin {
         this.canvas.off('mouse:out', this.handleMouseOut);
     }
 
-    // updateCursorCircle() {
-    //     const dashArray = this.getStrokeDashArray();
-    //     const isOutlined = this.cursorOutlineType === 'dashed' || this.cursorOutlineType === 'dotted';
-
-    //     if (!this.cursorCircle) {
-    //         this.cursorCircle = new fabric.Circle({
-    //             radius: this.brushSize / 2,
-    //             fill: this.cursorFill
-    //                 ? (this.useBrushColorPrimaryColor
-    //                     ? this.getFillColorWithOpacity(this.brushColor, this.brushOpacity)
-    //                     : this.getFillColorWithOpacity(this.cursorPrimaryColor, this.cursorRingOpacityAffected ? this.brushOpacity : 1))
-    //                 : 'transparent',
-    //             stroke: this.getCursorStrokeColor(),
-    //             strokeWidth: this.cursorOutlineType === 'none' ? 0 : this.cursorLineWidth,
-    //             selectable: false,
-    //             evented: false,
-    //             hasControls: false,
-    //             hasBorders: false,
-    //             originX: 'center',
-    //             originY: 'center',
-    //             strokeDashArray: dashArray,
-    //             hoverCursor: 'none'
-    //         });
-
-    //         if (isOutlined && !this.useBrushColorForCursorRing) {
-    //             this.secondaryCircle = new fabric.Circle({
-    //                 radius: this.brushSize / 2,
-    //                 fill: 'transparent',
-    //                 stroke: this.cursorSecondaryColor,
-    //                 strokeWidth: this.cursorLineWidth,
-    //                 selectable: false,
-    //                 evented: false,
-    //                 hasControls: false,
-    //                 hasBorders: false,
-    //                 originX: 'center',
-    //                 originY: 'center',
-    //                 strokeDashArray: dashArray,
-    //                 strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
-    //                 hoverCursor: 'none'
-    //             });
-    //             this.canvas.add(this.secondaryCircle);
-    //         }
-
-    //         this.canvas.add(this.cursorCircle);
-    //         if (this.secondaryCircle) {
-    //             this.secondaryCircle.bringToFront();
-    //         }
-    //         this.cursorCircle.bringToFront();
-    //     } else {
-    //         this.cursorCircle.set({
-    //             radius: this.brushSize / 2,
-    //             fill: this.cursorFill
-    //                 ? (this.useBrushColorPrimaryColor
-    //                     ? this.getFillColorWithOpacity(this.brushColor, this.brushOpacity)
-    //                     : this.getFillColorWithOpacity(this.cursorPrimaryColor, this.cursorRingOpacityAffected ? this.brushOpacity : 1))
-    //                 : 'transparent',
-    //             stroke: this.getCursorStrokeColor(),
-    //             strokeWidth: this.cursorOutlineType === 'none' ? 0 : this.cursorLineWidth,
-    //             strokeDashArray: dashArray
-    //         });
-
-    //         if (isOutlined && !this.useBrushColorForCursorRing) {
-    //             if (!this.secondaryCircle) {
-    //                 this.secondaryCircle = new fabric.Circle({
-    //                     radius: this.brushSize / 2,
-    //                     fill: 'transparent',
-    //                     stroke: this.cursorSecondaryColor,
-    //                     strokeWidth: this.cursorLineWidth,
-    //                     selectable: false,
-    //                     evented: false,
-    //                     hasControls: false,
-    //                     hasBorders: false,
-    //                     originX: 'center',
-    //                     originY: 'center',
-    //                     strokeDashArray: dashArray,
-    //                     strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
-    //                     hoverCursor: 'none'
-    //                 });
-    //                 this.canvas.add(this.secondaryCircle);
-    //             } else {
-    //                 this.secondaryCircle.set({
-    //                     radius: this.brushSize / 2,
-    //                     stroke: this.cursorSecondaryColor,
-    //                     strokeWidth: this.cursorLineWidth,
-    //                     strokeDashArray: dashArray,
-    //                     strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0]
-    //                 });
-    //             }
-    //         } else if (this.secondaryCircle) {
-    //             this.canvas.remove(this.secondaryCircle);
-    //             this.secondaryCircle = null;
-    //         }
-    //     }
-
-    //     if (this.currentZoom !== 0) {
-    //         const scale = 1 / this.currentZoom;
-    //         this.cursorCircle.set({
-    //             scaleX: scale,
-    //             scaleY: scale
-    //         });
-    //         if (this.secondaryCircle) {
-    //             this.secondaryCircle.set({
-    //                 scaleX: scale,
-    //                 scaleY: scale
-    //             });
-    //         }
-    //     }
-    // }
-
     updateCursorCircle() {
         const dashArray = this.getStrokeDashArray();
         const isOutlined = this.cursorOutlineType === 'dashed' || this.cursorOutlineType === 'dotted';
     
-        // Define positions off the canvas
-        const offCanvasPosition = -100000; // Position to the top-left outside the canvas
+        const offCanvasPosition = -100000;
     
         if (!this.cursorCircle) {
             this.cursorCircle = new fabric.Circle({
@@ -623,8 +503,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 hasBorders: false,
                 originX: 'center',
                 originY: 'center',
-                left: offCanvasPosition, // Set initial horizontal position off-canvas
-                top: offCanvasPosition,  // Set initial vertical position off-canvas
+                left: offCanvasPosition,
+                top: offCanvasPosition,
                 strokeDashArray: dashArray,
                 hoverCursor: 'none'
             });
@@ -641,8 +521,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
                     hasBorders: false,
                     originX: 'center',
                     originY: 'center',
-                    left: offCanvasPosition, // Set initial horizontal position off-canvas
-                    top: offCanvasPosition,  // Set initial vertical position off-canvas
+                    left: offCanvasPosition, 
+                    top: offCanvasPosition,
                     strokeDashArray: dashArray,
                     strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
                     hoverCursor: 'none'
@@ -681,8 +561,8 @@ export class CustomBrushPlugin extends CanvasPlugin {
                         hasBorders: false,
                         originX: 'center',
                         originY: 'center',
-                        left: offCanvasPosition, // Set initial horizontal position off-canvas
-                        top: offCanvasPosition,  // Set initial vertical position off-canvas
+                        left: offCanvasPosition,
+                        top: offCanvasPosition, 
                         strokeDashArray: dashArray,
                         strokeDashOffset: this.cursorOutlineType === 'dashed' ? dashArray[0] : dashArray[0],
                         hoverCursor: 'none'
@@ -716,8 +596,7 @@ export class CustomBrushPlugin extends CanvasPlugin {
                 });
             }
         }
-    
-        // Ensure the canvas is re-rendered to reflect changes
+
         this.canvas.requestRenderAll();
     }
     
@@ -758,13 +637,13 @@ export class CustomBrushPlugin extends CanvasPlugin {
         opt.e.stopPropagation();
 
         let deltaSize = delta < 0 ? 1 : -1;
-        deltaSize *= this.brushTipResizeSpeed;
+        deltaSize *= this.brushTipResizeSpeed; //currenly set to 1
         this.brushSize = Math.min(this.maxBrushSize, Math.max(this.minBrushSize, this.brushSize + deltaSize));
         this.brushSizeInput.value = this.brushSize;
         this.updateCursorCircle();
         this.canvas.requestRenderAll();
     }
-
+    
     handleMouseOver() {
         if (this.drawingMode) {
             if (this.cursorCircle) {

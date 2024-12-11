@@ -63,14 +63,14 @@ export class CanvasManager extends EventEmitter {
         }
         plugin.init(this);
         this.plugins.add(plugin);
-        console.log(`CanvasManager: Registered plugin ${plugin.name}`);
+        // console.log(`CanvasManager: Registered plugin ${plugin.name}`);
     }
 
     unregisterPlugin(plugin) {
         if (this.plugins.has(plugin)) {
             plugin.destroy();
             this.plugins.delete(plugin);
-            console.log(`CanvasManager: Unregistered plugin ${plugin.name}`);
+            // console.log(`CanvasManager: Unregistered plugin ${plugin.name}`);
         }
     }
 

@@ -2,6 +2,7 @@ import { store } from '../scripts/stateManagerMain.js';
 import { updateWorkflow } from './workflowManager.js';
 
 function getNestedValue(obj, path) {
+    // console.log('getNestedValue', obj, path);
     return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined) ? acc[key] : undefined, obj);
 }
 
@@ -25,7 +26,7 @@ class DataComponent {
         const data = getNestedValue(state, this.dataPath);
 
         if (data === undefined) {
-            console.warn(`DataComponent [${this.id}]: No data found at path "${this.dataPath}" in the store.`);
+            // console.warn(`DataComponent [${this.id}]: No data found at path "${this.dataPath}" in the store.`);
             return;
         }
 

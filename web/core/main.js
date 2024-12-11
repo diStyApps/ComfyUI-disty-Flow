@@ -262,6 +262,7 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
 
 
     async function queue() {   
+        console.log("Queueing new job");
 
         if (canvasLoader && canvasLoader.isInitialized) {
             await CanvasComponent(flowConfig, workflow, canvasLoader);
@@ -290,7 +291,10 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
         console.log(`Added job to queue. Job ID: ${jobId}`);
         console.log("Current queue:", StateManager.getJobQueue());
         console.log("queued workflow:", workflow);        
-
+        store.dispatch({
+            type: 'SET_QUEUE_RUNNING',
+            payload: true
+        });
         updateQueueDisplay(StateManager.getJobQueue());
         
         if (!StateManager.isProcessing()) {
@@ -303,6 +307,10 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
             type: 'TOGGLE_MASK',
             payload: true
         });
+
+
+
+        
         if (StateManager.isProcessing()) return;
         
         if (StateManager.getJobQueue().length === 0) {
@@ -341,7 +349,7 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
             if (!response.ok) {
                 throw new Error('Failed to process prompt.');
             }
-            const result = await response.json();
+            // const result = await response.json();
         } catch (error) {
             console.error('Error processing prompt:', error);
             throw error;
@@ -384,9 +392,10 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
     }
 
     async function queue_interrupt() {
-        showSpinner('Interrupting...');
+        console.log("Interrupting last job");
         const data = { 'client_id': client_id };
         try {
+            showSpinner();
             const response = await fetch('/interrupt', {
                 method: 'POST',
                 cache: 'no-cache',
@@ -398,18 +407,17 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
             if (!response.ok) {
                 throw new Error('Failed to interrupt the process.');
             }
-
             const result = await response.json();
             console.log('Interrupted:', result);
         } catch (error) {
             console.error('Error during interrupt:', error);
+            hideSpinner();
         } finally {
-            // hideSpinner();
+            hideSpinner();
         }
     }
 
     document.getElementById('generateButton').addEventListener('click', function () {
-        console.log("Queueing new job");
         queue();
     });
     document.addEventListener('keydown', function(event) {
@@ -419,7 +427,6 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
         }
     });
     document.getElementById('interruptButton').addEventListener('click', function () {
-        console.log("Interrupting last job");
         interrupt();
     });
 

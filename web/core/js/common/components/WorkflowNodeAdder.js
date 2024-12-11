@@ -3,40 +3,53 @@ class WorkflowNodeAdder {
         if (typeof workflow !== 'object' || workflow === null || Array.isArray(workflow)) {
             throw new TypeError('Workflow must be a non-null object');
         }
-        this.workflow = { ...workflow };
+        this.workflow = JSON.parse(JSON.stringify(workflow));
         this.existingIds = new Set(Object.keys(this.workflow).map(id => parseInt(id, 10)));
         this.highestId = this._getHighestNodeId();
-        this.loraCount = this._countExistingLoras();
     }
 
-    addLora() {
+    addLora(modelLoaderId) {
+        if (!this.workflow[modelLoaderId]) {
+            throw new Error(`Model loader node with ID ${modelLoaderId} does not exist.`);
+        }
+
+        const modelLoader = this.workflow[modelLoaderId];
+        if (!this._isModelLoader(modelLoader.class_type)) {
+            throw new Error(`Node ID ${modelLoaderId} is not a recognized model loader.`);
+        }
+
         const newLoraId = this._getNextNodeId();
         const loraNode = this._createLoraNode(newLoraId);
 
-        const existingLoras = this._findLoraNodes();
-
+        const existingLoras = this._findLoraNodes(modelLoaderId);
         if (existingLoras.length === 0) {
-            const modelLoaders = this._findModelLoaders();
-            if (modelLoaders.length === 0) {
-                throw new Error('No model loader found in the workflow to attach LoRA');
+            const firstConnectedNodes = this._findConnectedNodes(modelLoaderId);
+            if (firstConnectedNodes.length === 0) {
+                throw new Error(`No nodes are directly connected to model loader ID ${modelLoaderId}.`);
             }
 
-            modelLoaders.forEach(loader => {
-                const originalModelInput = loader.inputs.model;
-                loader.inputs.model = [newLoraId.toString(), 0];
-                loraNode.inputs.model = originalModelInput;
+            firstConnectedNodes.forEach(node => {
+                node.inputs.model = [newLoraId.toString(), 0];
             });
+
+            loraNode.inputs.model = [modelLoaderId.toString(), 0];
         } else {
-            const lastLora = existingLoras[existingLoras.length - 1];
-            const originalModelInput = lastLora.inputs.model;
-            lastLora.inputs.model = [newLoraId.toString(), 0];
-            loraNode.inputs.model = originalModelInput;
+            const lastLora = this._getLastLoraNode(existingLoras);
+            const firstConnectedNodes = this._findConnectedNodes(lastLora.id);
+            if (firstConnectedNodes.length === 0) {
+                throw new Error(`No nodes are directly connected to the last LoRA node ID ${lastLora.id}.`);
+            }
+
+            firstConnectedNodes.forEach(node => {
+                node.inputs.model = [newLoraId.toString(), 0];
+            });
+
+            loraNode.inputs.model = [lastLora.id.toString(), 0];
         }
 
         this.workflow[newLoraId.toString()] = loraNode;
         this.existingIds.add(newLoraId);
         this.highestId = newLoraId;
-        this.loraCount += 1;
 
         return newLoraId;
     }
@@ -59,22 +72,44 @@ class WorkflowNodeAdder {
         };
     }
 
-    _findLoraNodes() {
+    _findLoraNodes(modelLoaderId) {
         return Object.entries(this.workflow)
             .filter(([_, node]) => node.class_type === "LoraLoaderModelOnly")
-            .map(([id, node]) => ({ id: parseInt(id, 10), ...node }));
+            .map(([id, node]) => ({ id: parseInt(id, 10), ...node }))
+            .filter(lora => {
+                const modelInput = lora.inputs.model;
+                return Array.isArray(modelInput) && parseInt(modelInput[0], 10) === modelLoaderId;
+            });
     }
 
     _findModelLoaders() {
-        const modelLoaders = [];
+        return Object.entries(this.workflow)
+            .filter(([_, node]) => {
+                const hasModelInput = node.inputs && node.inputs.model !== undefined;
+                return !hasModelInput && this._isModelLoader(node.class_type);
+            })
+            .map(([id, node]) => ({ id: parseInt(id, 10), ...node }));
+    }
 
-        Object.entries(this.workflow).forEach(([id, node]) => {
-            if (node.inputs && Array.isArray(node.inputs.model) && node.inputs.model.length === 2) {
-                modelLoaders.push({ id: parseInt(id, 10), ...node });
-            }
-        });
+    _isModelLoader(classType) {
+        const modelLoaderTypes = ["UNETLoader","CheckpointLoaderSimple","DownloadAndLoadMochiModel,UnetLoaderGGUF"];
+        return modelLoaderTypes.includes(classType);
+    }
 
-        return modelLoaders;
+    _findConnectedNodes(nodeId) {
+        return Object.entries(this.workflow)
+            .filter(([_, node]) => {
+                if (!node.inputs || !node.inputs.model) return false;
+                const modelInput = node.inputs.model;
+                return Array.isArray(modelInput) && parseInt(modelInput[0], 10) === nodeId;
+            })
+            .map(([id, node]) => ({ id: parseInt(id, 10), ...node }));
+    }
+
+    _getLastLoraNode(loraNodes) {
+        return loraNodes.reduce((prev, current) => {
+            return (prev.id > current.id) ? prev : current;
+        }, loraNodes[0]);
     }
 
     _getNextNodeId() {
@@ -82,11 +117,7 @@ class WorkflowNodeAdder {
     }
 
     _getHighestNodeId() {
-        return Math.max(...this.existingIds, 0);
-    }
-
-    _countExistingLoras() {
-        return this._findLoraNodes().length;
+        return this.existingIds.size > 0 ? Math.max(...this.existingIds) : 0;
     }
 }
 
