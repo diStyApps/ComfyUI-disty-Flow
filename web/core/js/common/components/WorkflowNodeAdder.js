@@ -92,7 +92,7 @@ class WorkflowNodeAdder {
     }
 
     _isModelLoader(classType) {
-        const modelLoaderTypes = ["UNETLoader","CheckpointLoaderSimple","DownloadAndLoadMochiModel,UnetLoaderGGUF"];
+        const modelLoaderTypes = ["UNETLoader","CheckpointLoaderSimple","DownloadAndLoadMochiModel","UnetLoaderGGUF"];
         return modelLoaderTypes.includes(classType);
     }
 
