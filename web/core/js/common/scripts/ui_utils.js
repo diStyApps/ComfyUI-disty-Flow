@@ -53,7 +53,7 @@ const addWidgetMenuRight = (menuRight) => {
     const flowButton = createWidget({
         className: 'comfyui-button comfyui-menu-mobile-collapse primary',
         text: '',
-        tooltip: 'Start Flow',
+        tooltip: 'Launch Flow',
         includeIcon: true,
         svgMarkup: getFlowIcon(), 
     });

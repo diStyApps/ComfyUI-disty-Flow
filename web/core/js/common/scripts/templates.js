@@ -924,5 +924,32 @@ const componentTemplates = {
             }
         }
     },    
+    Toggle_ON : {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'Toggle',
+            params: {
+                label: 'Prompt',
+                defaultValue: true,
+                nodePath: '{nodeId}.inputs.boolean',
+            }
+        }
+    },
+    
+    Toggle_OFF : {
+        type: 'component',
+        nodeClass: null,
+        component: {
+            type: 'toggle',
+            params: {
+                label: 'Toggle',
+                defaultValue: false,
+                nodePath: '{nodeId}.inputs.boolean',
+            }
+         }
+    },
+    
 };
+
 export { componentTemplates };

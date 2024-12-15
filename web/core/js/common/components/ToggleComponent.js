@@ -15,36 +15,46 @@ class ToggleComponent {
             ...config
         };
         this.workflow = workflow;
-        this.value = this.config.defaultValue;
+        this.value = typeof this.config.defaultValue === "boolean" 
+            ? (this.config.defaultValue ? 1 : 0) 
+            : (this.config.defaultValue === "true" ? 1 : 0);
+
+        console.log("ToggleComponent", this.value, this.config.id, this.config.defaultValue);
 
         this.buildUI();
         this.initializeUI();
     }
 
     buildUI() {
+        const toggleId = `${this.config.id}Toggle`;
+
         const html = `
             <div class="toggle-component-wrapper">
                 ${this.config.labelPosition === 'left' ? this.getLabelHTML() : ''}
                 <div class="toggle-component">
-                    <label class="toggle-switch">
-                        <input 
-                            type="checkbox" 
-                            id="${this.config.id}Toggle" 
-                            class="toggle-input" 
-                            ${this.value ? 'checked' : ''}
-                            aria-checked="${this.value}"
-                            role="switch"
-                        >
-                        <span class="slider"></span>
+                    <input 
+                        id="${toggleId}" 
+                        class="toggle" 
+                        type="checkbox" 
+                        role="switch" 
+                        name="toggle" 
+                        value="on" 
+                        ${this.value ? 'checked' : ''}
+                        aria-checked="${this.value}"
+                    >
+                    <label for="${toggleId}" class="slot">
+                        <span class="slot__label">OFF</span>
+                        <span class="slot__label">ON</span>
                     </label>
+                    <div class="curtain"></div>
                 </div>
                 ${this.config.labelPosition === 'right' ? this.getLabelHTML() : ''}
             </div>
         `;
         this.container.innerHTML = html;
 
-        this.inputElement = document.getElementById(`${this.config.id}Toggle`);
-        this.labelElement = this.container.querySelector('.toggle-label');
+        this.inputElement = this.container.querySelector(`#${toggleId}`);
+        this.labelElement = this.container.querySelector('.toggle-label-container');
 
         this.attachEventListeners();
     }
@@ -65,7 +75,7 @@ class ToggleComponent {
     }
 
     updateValue(newValue) {
-        this.value = newValue;
+        this.value = newValue ? 1 : 0;
         this.updateDisplay();
         this.updateExternalConfig();
     }
@@ -98,7 +108,6 @@ class ToggleComponent {
         }
         target[pathParts[pathParts.length - 1]] = this.value;
     }
-
 
     attachEventListeners() {
         if (this.inputElement) {

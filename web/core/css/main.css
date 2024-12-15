@@ -2280,3 +2280,180 @@ html:not(.css-loading) body {
         border: 1px dashed var(--color-border);
         background-color: var(--color-background-secondary);
     } */
+
+.toggle-component-wrapper {
+    display: flex;
+    align-items: center;
+    /* margin: 0.5em;  */
+    width: 100%;
+    background-color: var(--color-background-secondary);
+    margin-bottom: 0.5em; 
+    /* padding: 6px 0; */
+    height: 100%;
+}
+
+.toggle-label-container {
+    display: flex;
+    align-items: center;
+    margin-left: 4px; 
+    flex: 1; 
+    min-width: 100px; 
+    /* background: red; */
+    font-weight: bold;
+
+
+}
+
+.toggle-label-container img.toggle-icon {
+    width: 1em;
+    height: 1em;
+    /* margin-right: 0.5em; */
+
+}
+
+.toggle-label-container .toggle-label {
+    /* font-size: 1em; */
+    white-space: nowrap;
+
+}
+
+.toggle-component {
+    position: relative;
+    /* flex-shrink: 0;  */
+    /* padding: 0; */
+
+    /* background: blue; */
+    display: flex;
+    height: 100%;
+    padding: 6px 0;
+    padding-left: 10px ;
+
+
+
+}
+.toggle-component:hover {
+    cursor: pointer;
+    background-color: var(--color-background);
+}
+.toggle, .toggle:before, .slot__label, .curtain {
+    transition-property: background-color, transform, visibility;
+    transition-duration: 0.25s;
+    transition-timing-function: ease-in, cubic-bezier(0.6,0.2,0.4,1.5), linear;
+
+}
+.toggle:before, .slot, .slot__label {
+    display: block;
+
+}
+.toggle:before, .curtain {
+    position: absolute;
+    
+}
+
+.toggle:checked, .curtain {
+    
+}
+
+.toggle:focus {
+    outline: transparent;
+
+}
+
+.toggle {
+    width: 0.9em;
+    height: 1em;
+    border-radius: 50%;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    vertical-align: middle;
+    /* margin-right: 0.15em; */
+    /* Start as a hollow circle to simulate no "O" when off */
+    background: transparent;
+    border: 0.25em solid var(--color-primary-text);
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    vertical-align: middle;
+
+}
+
+.toggle:before {
+    content: none;
+}
+
+.toggle:checked {
+    /* background: #2b7f3a; */
+    /* border-color: #2b7f3a; */
+    /* background: transparent; */
+    border-color: var(--color-button-secondary-text);
+
+}
+
+.slot {
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 17px;
+    /* letter-spacing: 0.2em; */
+    line-height: 1em;
+    overflow: hidden;
+    height: 1em;
+    /* text-indent: -0.8em; */
+    /* -webkit-text-stroke: 0.03em #fff; */
+    user-select: none;
+    font-weight: bold;
+    padding-right: 6px;
+    color: var(--color-primary-text);
+}
+
+.slot__label {
+    transform-origin: 50% 0;
+    /* color: red; */
+    /* background: green; */
+    letter-spacing: 0.2em;
+    line-height: 0.8em;
+    overflow: hidden;
+    height: 1em;
+    text-indent: -0.8em;
+
+
+}
+
+.slot__label:nth-child(2) {
+    transform-origin: 50% 100%;
+}
+
+.toggle:checked ~ .slot .slot__label {
+    transform: translateY(-50%) scaleY(0);
+    color: var(--color-button-secondary-text);
+
+}
+
+.toggle:checked ~ .slot .slot__label:nth-child(2) {
+    transform: translateY(-100%) scaleY(1);
+} 
+.curtain {
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+
+
+.toggle:checked ~ .curtain {
+    transform: scaleX(1);
+}
+
+@media (max-width: 600px) {
+    .toggle-component-wrapper {
+        max-width: 100%;
+    }
+    .toggle-label-container {
+        flex: none;
+        min-width: 80px;
+    }
+}
