@@ -16,7 +16,7 @@ async function fetchNodeInfo(classType) {
 
 async function fetchExtensionNodeMap() {
     try {
-        const response = await fetch('/api/extension-node-map');
+        const response = await fetch('/flow/api/extension-node-map');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

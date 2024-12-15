@@ -63,7 +63,7 @@ function enrichMissingCustomPackages(missingCustomPackages, flowConfig) {
 
 async function fetchInstalledCustomNodes() {
     try {
-        const response = await fetch('/api/installed-custom-nodes');
+        const response = await fetch('/flow/api/installed-custom-nodes');
         if (response.ok) {
             const data = await response.json();
             return data.installedNodes || [];
@@ -311,7 +311,7 @@ function handleButtonClick(button, requestFunction) {
 
 function sendInstallRequest(packageUrl, downloadModal, statusMessageElement) {
     statusMessageElement.textContent = 'Installing...';
-    return fetch('/api/install-package', {
+    return fetch('/flow/api/install-package', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packageUrl, downloadModal })
@@ -334,7 +334,7 @@ function sendInstallRequest(packageUrl, downloadModal, statusMessageElement) {
 
 function sendUpdateRequest(packageUrl, downloadModal, statusMessageElement) {
     statusMessageElement.textContent = 'Updating...';
-    return fetch('/api/update-package', {
+    return fetch('/flow/api/update-package', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packageUrl })
@@ -357,7 +357,7 @@ function sendUpdateRequest(packageUrl, downloadModal, statusMessageElement) {
 
 function sendUninstallRequest(packageUrl, downloadModal, statusMessageElement) {
     statusMessageElement.textContent = 'Uninstalling...';
-    return fetch('/api/uninstall-package', {
+    return fetch('/flow/api/uninstall-package', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packageUrl })

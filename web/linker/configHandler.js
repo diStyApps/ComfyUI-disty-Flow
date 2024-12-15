@@ -296,7 +296,7 @@ async function previewFlow(workflowConfigElement, state) {
         formData.append('flowConfig', new Blob([JSON.stringify(previewConfig)], { type: 'application/json' }));
         formData.append('wf', wfFile);
 
-        fetch('/api/preview-flow', { method: 'POST', body: formData })
+        fetch('/flow/api/preview-flow', { method: 'POST', body: formData })
             .then(response => {
                 if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
                 return response.json();
@@ -313,7 +313,7 @@ async function previewFlow(workflowConfigElement, state) {
 }
 
 function resetPreview() {
-    fetch('/api/reset-preview', { method: 'POST' })
+    fetch('/flow/api/reset-preview', { method: 'POST' })
         .then(response => {
             if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
             return response.json();
@@ -347,7 +347,7 @@ function createFlow(workflowConfigElement, state) {
         formData.append('wf', wfFile);
         formData.append('thumbnail', state.thumbnail);
 
-        fetch('/api/create-flow', { method: 'POST', body: formData })
+        fetch('/flow/api/create-flow', { method: 'POST', body: formData })
             .then(response => {
                 if (!response.ok) {
                     return response.text().then(text => { throw new Error(text); });
@@ -393,7 +393,7 @@ function updateFlow(workflowConfigElement, state) {
             formData.append('wf', wfFile);
         }
 
-        fetch('/api/update-flow', { method: 'POST', body: formData })
+        fetch('/flow/api/update-flow', { method: 'POST', body: formData })
             .then(response => {
                 if (!response.ok) {
                     return response.text().then(text => { throw new Error(text); });
@@ -425,7 +425,7 @@ function deleteFlow(workflowConfigElement) {
             return;
         }
 
-        fetch(`/api/delete-flow?url=${encodeURIComponent(flowUrl)}`, { method: 'DELETE' })
+        fetch(`/flow/api/delete-flow?url=${encodeURIComponent(flowUrl)}`, { method: 'DELETE' })
             .then(response => {
                 if (!response.ok) {
                     return response.text().then(text => { throw new Error(text); });

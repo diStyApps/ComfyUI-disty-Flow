@@ -206,7 +206,7 @@ function updateGlobalCategories(flows) {
 
 export async function loadFlows() {
     try {
-        const response = await fetch('/api/apps');
+        const response = await fetch('/flow/api/apps');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -573,7 +573,7 @@ export function initializeUI() {
 
 export async function getVersion() {
     try {
-        const response = await fetch('/api/flow-version');
+        const response = await fetch('/flow/api/flow-version');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
