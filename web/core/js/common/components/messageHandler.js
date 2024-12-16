@@ -1,5 +1,7 @@
 import { WebSocketHandler } from './webSocketHandler.js';
-import { updateProgress, displayImagesInDiv as displayOutputMedia } from './imagedisplay.js';
+import { displayImagesInDiv as displayOutputMedia } from './imagedisplay.js';
+// import { ProgressUpdater } from './progressbar.js';
+import './progressbar.js'; 
 import { hideSpinner } from './utils.js';
 import { store } from  '../scripts/stateManagerMain.js';
 class IMessageProcessor {
@@ -79,7 +81,6 @@ async function detectMimeType(blob) {
     return null;
 }
 
-
 class BlobMessageProcessor extends IMessageProcessor {
     constructor(messageHandler) {
         super();
@@ -149,6 +150,7 @@ export class MessageHandler {
         this.canvasCroppedMaskOutputs = null;
         this.AlphaMaskImageDataURL = null;
         this.imageDataType = null;
+        this.progressUpdater = new window.ProgressUpdater('main-progress', 'progress-text');
     }
 
     setOriginalImage(dataURL) {
@@ -239,11 +241,16 @@ export class MessageHandler {
         } else {
             console.warn('Unknown message type:', typeof event.data);
         }
-    }    
-
+    }   
+    updateProgress(data = {}) {
+        this.progressUpdater.update(data);
+    }
     handleProgress(data) {
         this.hideSpinnerOnce();
-        updateProgress(data.max, data.value);
+        this.updateProgress(data);
+    }
+    handleStatus() {
+        // this.updateProgress();
     }
     hideSpinnerOnce() {
         if (!this.spinnerHidden) {
@@ -251,6 +258,7 @@ export class MessageHandler {
             this.spinnerHidden = true;
         }
     }
+    
     handleMonitor(data) {
         console.log('Monitor data received:', data);
     }
@@ -332,9 +340,7 @@ export class MessageHandler {
         window.dispatchEvent(event);
     }
 
-    handleStatus() {
-        updateProgress();
-    }
+
 
     setStandardPreview(mediaUrl, addToHistory = false) {
         displayOutputMedia([mediaUrl], addToHistory);

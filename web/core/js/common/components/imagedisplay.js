@@ -646,26 +646,11 @@ class Lightbox {
     }
 }
 
-class ProgressUpdater {
-    constructor(progressBarId) {
-        this.progressBar = document.getElementById(progressBarId);
-        if (!this.progressBar) {
-            console.error(`Progress bar with ID '${progressBarId}' not found.`);
-        }
-    }
-
-    update(max = 0, value = 0) {
-        if (!this.progressBar) return;
-        this.progressBar.max = max;
-        this.progressBar.value = value;
-    }
-}
-
 class ImageDisplayApp {
+    
     constructor() {
         this.imageLoader = new ImageLoader('image-container');
         this.historyManager = new HistoryManager('images-container');
-        this.progressUpdater = new ProgressUpdater('main-progress');
     }
 
     displayImagesInDiv(imageUrls, addToHistory = true, isFinalImage = addToHistory) {
@@ -684,10 +669,6 @@ class ImageDisplayApp {
     clearImageContainer() {
         this.imageLoader.imageContainer.innerHTML = '';
         previousMediaElement = null;
-    }
- 
-    updateProgress(max = 0, value = 0) {
-        this.progressUpdater.update(max, value);
     }
 }
 

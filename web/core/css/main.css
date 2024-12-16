@@ -311,6 +311,49 @@ a {
     width: 100%;
 }
 
+.progress-container {
+    position: relative;
+    flex : 1;
+}
+
+.progress::-webkit-progress-value {
+    transition: width 0.2s ease-in-out;
+}
+
+.progress::-moz-progress-bar {
+    transition: width 0.2s ease-in-out;
+}
+
+#progress-text {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: var(--color-primary-text);
+    pointer-events: none;
+    white-space: nowrap;
+    display: flex;
+    gap: 10px;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    padding: 6px;
+}
+
+#progress-text.active {
+    opacity: 1;
+}
+
+  @media (max-width: 800px) {
+    #progress-text {
+      font-size: 12px;
+      gap: 5px;
+    }
+  }
+
+  .hidden {
+    display: none;
+  }
 #prompts {
     display: flex;
     flex-direction: column;
@@ -1201,6 +1244,14 @@ button:hover {
     .seeder-container > input[type="text"] {
         width:26%;
     }
+    .progress-times {
+        display: none;
+    }
+    #progress-text-divider-2{
+        display: none;
+    }
+
+
 }
 
 /* Tablets (768px to 992px) */
@@ -1218,6 +1269,13 @@ button:hover {
         flex-direction: column;
         justify-content: space-evenly;
     } 
+    .progress-steps {
+        display: none;
+    }
+    #progress-text-divider-1{
+        display: none;
+    }
+
 }
 
 /* Small Tablets and Large Phones */
@@ -1238,6 +1296,12 @@ button:hover {
         flex-direction: column;
         justify-content: space-evenly;
     } 
+    .progress-steps {
+        display: none;
+    }
+    #progress-text-divider-1{
+        display: none;
+    }
 }
 
 /* Mobile Devices */
@@ -2457,3 +2521,4 @@ html:not(.css-loading) body {
         min-width: 80px;
     }
 }
+

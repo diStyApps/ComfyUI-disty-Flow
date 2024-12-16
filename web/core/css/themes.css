@@ -55,13 +55,13 @@
     --color-button-secondary-active: #707070;
     --color-button-secondary-text-active: #000000;
     --color-progress-background: #000000;
-    --color-progress-value: #908989;
+    --color-progress-value: #423e3e;
     --color-scrollbar-track: #1e1e1f;
     --color-scrollbar-thumb: #7a7a7a;
     --color-input-range-thumb: #0d0d0d;
     --color-input-range-background: #707070;
-    --color-spinner: #908989;
-    --color-spinner-highlight: #908989;
+    --color-spinner: #423e3e;
+    --color-spinner-highlight: #423e3e;
 }
 
 [data-theme="monochrome-blanc"] {
@@ -114,13 +114,13 @@
     --color-button-secondary-active: #707070;
     --color-button-secondary-text-active: #000000;
     --color-progress-background: #1f1f1f;
-    --color-progress-value: #707070;
+    --color-progress-value: #5a5a5a;
     --color-scrollbar-track: #1e1e1f;
     --color-scrollbar-thumb: #7a7a7a;
     --color-input-range-thumb: #000000;
     --color-input-range-background: #707070;
-    --color-spinner: #908989;
-    --color-spinner-highlight: #908989;
+    --color-spinner: #5a5a5a;
+    --color-spinner-highlight: #5a5a5a;
 }
 [data-theme="dawn-realm"] {
     --color-background: #707070;
@@ -142,7 +142,7 @@
     --color-button-secondary-text-hover: #000000;
     --color-button-secondary-active: #707070;
     --color-button-secondary-text-active: #000000;
-    --color-progress-background: #1f1f1f;
+    --color-progress-background: #525252;
     --color-progress-value: #707070;
     --color-scrollbar-track: #1e1e1f;
     --color-scrollbar-thumb: #7a7a7a;
@@ -172,13 +172,13 @@
     --color-button-secondary-active: #00ff00;
     --color-button-secondary-text-active: #000000;
     --color-progress-background: #001a00;
-    --color-progress-value: #00ff00;
+    --color-progress-value: #007c00;
     --color-scrollbar-track: #001a00;
     --color-scrollbar-thumb: #00ff00;
     --color-input-range-thumb: #00ff00;
     --color-input-range-background: #001a00;
-    --color-spinner: #00ff00;
-    --color-spinner-highlight: #00ff00;
+    --color-spinner: #007c00;
+    --color-spinner-highlight: #007c00;
 }
 [data-theme="terminal-soft-dark"] {
     --color-background: #0a0a0a;
@@ -201,7 +201,7 @@
     --color-button-secondary-active: #4ec94e;
     --color-button-secondary-text-active: #1a1a1a;
     --color-progress-background: #1a2b1a;
-    --color-progress-value: #7aff7a;
+    --color-progress-value: #316831;
     --color-scrollbar-track: #151515;
     --color-scrollbar-thumb: #4ec94e;
     --color-input-range-thumb: #1a1a1a;
