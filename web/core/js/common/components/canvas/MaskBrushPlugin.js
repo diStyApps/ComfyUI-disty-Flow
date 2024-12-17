@@ -35,11 +35,11 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.maskExportUtilities = new MaskExportUtilities(this);
         this.onToggleHidePreviewMask = this.onToggleHidePreviewMask.bind(this);
         this.onResumeMask = this.onResumeMask.bind(this);
-        // store.subscribe((state) => {
-        //     if (state.isQueueRunning) {
-        //         this.hideMask();
-        //     }
-        // });
+        store.subscribe((state) => {
+            if (state.isQueueRunning) {
+                this.hideMask();
+            }
+        });
     }
 
     init(canvasManager) {
@@ -70,8 +70,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.hideMaskPreviewCheckbox.addEventListener('change', this.onToggleHidePreviewMask);
         this.saveMaskBtn.addEventListener('click', this.onHandleSave);
         this.eraserBtn.addEventListener('click', this.onToggleEraser);
-
-
         this.canvasManager.on('image:loaded', this.onImageLoaded);
         this.canvasManager.on('undo:mask:stroke', this.onUndoMaskStroke);
         this.canvasManager.on('redo:mask:stroke', this.onRedoMaskStroke);
@@ -96,7 +94,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
         this.hideAllMasksCheckbox.removeEventListener('change', this.onToggleHideAllMasks);
         this.hideMaskPreviewCheckbox.removeEventListener('change', this.onToggleHidePreviewMask);
         this.saveMaskBtn.removeEventListener('click', this.onHandleSave);
-
         this.canvasManager.off('image:loaded', this.onImageLoaded);
         this.canvasManager.off('undo:mask:stroke', this.onUndoMaskStroke);
         this.canvasManager.off('redo:mask:stroke', this.onRedoMaskStroke);
@@ -210,7 +207,6 @@ export class MaskBrushPlugin extends CustomBrushPlugin {
     }
     
     addNewMask() {
-        // Clear the current masks from the canvas
         this.masks.forEach(mask => {
             this.canvas.remove(mask.fabricImage);
         });
