@@ -17,7 +17,11 @@
 <br />
 <div align="center">
 
-[![](web/core/media/git/patreon.svg)](https://www.patreon.com/distyx)
+[![Patreon](https://img.shields.io/badge/Patreon-Support-orange?logo=patreon&logoColor=white&style=for-the-badge)](https://www.patreon.com/distyx)
+[![Discord](https://img.shields.io/badge/Discord-Join-blue?logo=discord&logoColor=white&style=for-the-badge)](https://discord.com/invite/M3PWExxVbP)
+[![YouTube](https://img.shields.io/badge/YouTube-Subscribe-red?logo=youtube&logoColor=white&style=for-the-badge)](https://www.youtube.com/@Flowcomfy/videos)
+
+
 
 <!-- <img src="media/covers/cover.jpg"> -->
 
