@@ -30,14 +30,31 @@ export default class Dropdown {
     }
 
     populate(data) {
-        const loaderData = data[Object.keys(data)[0]];
-        if (!loaderData.input.required[this.config.key]) {
+        const firstKey = Object.keys(data)[0];
+        const loaderData = data[firstKey];
+
+        let inputData = loaderData.input.required[this.config.key];
+        
+        if (!inputData) {
+            console.warn(`Required input for key "${this.config.key}" is missing. Checking for optional input.`);
+            inputData = loaderData.input.optional ? loaderData.input.optional[this.config.key] : undefined;
+        }
+        
+        if (!inputData) {
             this.displayMissingComponentMessage();
             return;
         }
-        populateDropdown(this.config.id, loaderData.input.required[this.config.key][0], this.config.label, this.config.nodePath, this.workflow);
+                populateDropdown(
+            this.config.id,
+            inputData[0],
+            this.config.label,
+            this.config.nodePath,
+            this.workflow
+        );
     }
-
+    
+    
+    
     displayMissingComponentMessage() {
         if (this.loaderContainer) {
             this.loaderContainer.innerHTML = '';
