@@ -3,7 +3,7 @@ import mimetypes
 from pathlib import Path
 import re
 APP_NAME = "Flow"
-APP_VERSION = "0.4.9" 
+APP_VERSION = "0.5.0" 
 FLOWMSG = f"\033[38;5;129mFlow - {APP_VERSION}\033[0m"
 APP_CONFIGS = []
 
@@ -58,7 +58,7 @@ FLOWS_TO_REMOVE = [
     "afl_pulid_flux_GGUF",
     "afl_reactor"
     "5otvy-cogvideox-orbit-left-lora",
-    "umbi9-hunyuan-text-to-video"
+    "umbi9-hunyuan-text-to-video",
 ]
 
 NODE_CLASS_MAPPINGS = {}

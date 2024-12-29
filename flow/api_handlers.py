@@ -1,14 +1,13 @@
-import json
 import shutil
-import subprocess
-import sys
 import os
-import stat
 import re
 import base64
+import json
+import hashlib
+import urllib.parse
 from pathlib import Path
 from aiohttp import web
-from typing import Dict, Any
+from typing import Any
 from io import BytesIO
 from PIL import Image
 
@@ -17,6 +16,207 @@ from .constants import (
     CUSTOM_NODES_DIR, FLOWMSG, logger, FLOWS_PATH, WEBROOT, CORE_PATH,
     SAFE_FOLDER_NAME_REGEX, ALLOWED_EXTENSIONS, CUSTOM_THEMES_DIR, FLOWS_CONFIG_FILE
 )
+
+DATA_DIR = Path(__file__).parent / "data"
+PREVIEWS_REGISTRY_DIR = DATA_DIR / "model_previews_registry"
+PREVIEWS_IMAGES_DIR = DATA_DIR / "model_previews"
+
+def ensure_data_folders():
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        PREVIEWS_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
+        PREVIEWS_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Could not create data dirs: {e}")
+
+def pathToKey(model_path: str) -> str:
+    return model_path.replace('\\', '/')
+
+def get_filename_only(model_path: str) -> str:
+    fwd = pathToKey(model_path)
+    return os.path.basename(fwd)
+
+def get_preview_id(model_path: str) -> str:
+    filename = get_filename_only(model_path)
+    h = hashlib.sha1(filename.encode('utf-8')).hexdigest()
+    return h[:16]
+
+def get_preview_paths(preview_id: str):
+    sub1 = preview_id[0]
+    sub2 = preview_id[:2]
+    registry_json = PREVIEWS_REGISTRY_DIR / sub1 / sub2 / f"{preview_id}.json"
+    image_folder = PREVIEWS_IMAGES_DIR / sub1 / sub2 / preview_id
+    return registry_json, image_folder
+
+async def set_model_preview_handler(request: web.Request) -> web.Response:
+    try:
+        ensure_data_folders()
+        data = await request.json()
+        rawPath = data.get("modelPath") 
+        base64_data = data.get("base64Data")
+        if not rawPath or not base64_data:
+            return web.Response(status=400, text="Missing 'modelPath' or 'base64Data'")
+
+        pid = get_preview_id(rawPath) 
+        registry_json, image_folder = get_preview_paths(pid)
+
+        match = re.match(r"data:(image/\w+);base64,(.+)", base64_data)
+        if not match:
+            return web.Response(status=400, text="Invalid data URL format")
+
+        mime_type = match.group(1)
+        encoded = match.group(2)
+        try:
+            raw_image = base64.b64decode(encoded)
+        except:
+            return web.Response(status=400, text="Error decoding base64 image")
+
+        registry_json.parent.mkdir(parents=True, exist_ok=True)
+        image_folder.mkdir(parents=True, exist_ok=True)
+
+        full_path = image_folder / "full.jpg"
+        with full_path.open("wb") as f:
+            f.write(raw_image)
+
+        thumb_path = image_folder / "thumbnail.jpg"
+        img = Image.open(BytesIO(raw_image))
+        w_percent = 128.0 / float(img.size[0])
+        h_new = int(float(img.size[1]) * w_percent)
+        img = img.convert("RGB").resize((128, h_new), Image.Resampling.LANCZOS)
+        img.save(thumb_path, format="JPEG")
+
+        reg_data = {
+            "modelPath": rawPath,
+            "previewId": pid,
+            "timestamp": int(os.path.getmtime(full_path)),
+            "mime_type": mime_type
+        }
+        with registry_json.open("w", encoding="utf-8") as jf:
+            json.dump(reg_data, jf, indent=2)
+
+        return web.json_response({"status": "success", "previewId": pid})
+
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error in set_model_preview_handler: {e}")
+        return web.Response(status=500, text=str(e))
+
+async def clear_model_preview_handler(request: web.Request) -> web.Response:
+    try:
+        ensure_data_folders()
+        rawPath = request.query.get("modelPath", None)
+        if not rawPath:
+            return web.Response(status=400, text="Missing 'modelPath'")
+
+        pid = get_preview_id(rawPath)
+        registry_json, image_folder = get_preview_paths(pid)
+
+        if registry_json.exists():
+            registry_json.unlink()
+        if image_folder.exists() and image_folder.is_dir():
+            shutil.rmtree(image_folder)
+
+        return web.json_response({"status": "success", "previewId": pid})
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error in clear_model_preview_handler: {e}")
+        return web.Response(status=500, text=str(e))
+
+async def list_model_previews_handler(request: web.Request) -> web.Response:
+    try:
+        ensure_data_folders()
+        result_map = {}
+
+        if request.method == 'POST':
+            data = await request.json()
+            raw_paths = data.get('paths', [])
+            if not isinstance(raw_paths, list):
+                return web.Response(status=400, text="Invalid JSON: 'paths' must be an array")
+
+            for rp in raw_paths:
+                rp = urllib.parse.unquote(rp).strip()
+                if not rp:
+                    continue
+                pid = get_preview_id(rp)
+                _, image_folder = get_preview_paths(pid)
+                thumb = image_folder / "thumbnail.jpg"
+                if thumb.exists():
+                    with thumb.open("rb") as tf:
+                        b = tf.read()
+                    b64 = base64.b64encode(b).decode("utf-8")
+                    data_url = f"data:image/jpeg;base64,{b64}"
+                    result_map[rp] = data_url
+
+            return web.json_response(result_map)
+
+        paths_param = request.rel_url.query.get('paths', None)
+        if paths_param:
+            raw_split = paths_param.split(',')
+            for rp in raw_split:
+                rp = rp.strip()
+                if not rp:
+                    continue
+                rp = urllib.parse.unquote(rp)
+                pid = get_preview_id(rp)
+                _, image_folder = get_preview_paths(pid)
+                thumb = image_folder / "thumbnail.jpg"
+                if thumb.exists():
+                    with thumb.open("rb") as tf:
+                        b = tf.read()
+                    b64 = base64.b64encode(b).decode("utf-8")
+                    result_map[rp] = f"data:image/jpeg;base64,{b64}"
+            return web.json_response(result_map)
+
+        for root, dirs, files in os.walk(PREVIEWS_REGISTRY_DIR):
+            for filename in files:
+                if filename.endswith(".json"):
+                    regp = Path(root) / filename
+                    try:
+                        with regp.open("r", encoding="utf-8") as f:
+                            reg_data = json.load(f)
+                        mp = reg_data.get("modelPath")
+                        pid = reg_data.get("previewId")
+                        if not mp or not pid:
+                            continue
+
+                        _, folder = get_preview_paths(pid)
+                        thumb = folder / "thumbnail.jpg"
+                        if thumb.exists():
+                            with thumb.open("rb") as tf:
+                                b = tf.read()
+                            b64 = base64.b64encode(b).decode("utf-8")
+                            result_map[mp] = f"data:image/jpeg;base64,{b64}"
+                    except Exception as ex:
+                        logger.error(f"{FLOWMSG}: Error reading registry {regp}: {ex}")
+                        continue
+
+        return web.json_response(result_map)
+
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error in list_model_previews_handler: {e}")
+        return web.Response(status=500, text=str(e))
+
+async def get_model_preview_handler(request: web.Request) -> web.Response:
+    try:
+        ensure_data_folders()
+        rawPath = request.query.get("modelPath", None)
+        if not rawPath:
+            return web.Response(status=400, text="Missing 'modelPath'")
+
+        pid = get_preview_id(rawPath)
+        _, image_folder = get_preview_paths(pid)
+
+        thumb = image_folder / "thumbnail.jpg"
+        if thumb.exists():
+            with thumb.open("rb") as tf:
+                b = tf.read()
+            b64 = base64.b64encode(b).decode("utf-8")
+            data_url = f"data:image/jpeg;base64,{b64}"
+            return web.json_response({rawPath: data_url})
+        else:
+            return web.Response(status=404, text="Preview not found")
+
+    except Exception as e:
+        logger.error(f"{FLOWMSG}: Error in get_model_preview_handler: {e}")
+        return web.Response(status=500, text=str(e))
 
 async def apps_handler(request: web.Request) -> web.Response:
     return web.json_response(APP_CONFIGS)

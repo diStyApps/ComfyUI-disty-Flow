@@ -11,7 +11,11 @@ from .api_handlers import (
     apps_handler, extension_node_map_handler,
     install_package_handler, update_package_handler, uninstall_package_handler,
     installed_custom_nodes_handler, preview_flow_handler,
-    reset_preview_handler, create_flow_handler, update_flow_handler, delete_flow_handler
+    reset_preview_handler, create_flow_handler, update_flow_handler, delete_flow_handler,
+    set_model_preview_handler,
+    clear_model_preview_handler,
+    list_model_previews_handler,
+    get_model_preview_handler
 )
 
 class FlowManager:
@@ -68,6 +72,10 @@ class FlowManager:
             (f'/flow/api/create-flow', 'POST', create_flow_handler),
             (f'/flow/api/update-flow', 'POST', update_flow_handler),
             (f'/flow/api/delete-flow', 'DELETE', delete_flow_handler),
+            (f'/flow/api/model-preview', 'POST', set_model_preview_handler),
+            (f'/flow/api/model-preview', 'DELETE', clear_model_preview_handler),
+            (f'/flow/api/model-previews', 'POST', list_model_previews_handler),
+            (f'/flow/api/model-preview', 'GET', get_model_preview_handler),
         ]
 
         for path, method, handler in api_routes:
@@ -96,3 +104,5 @@ class FlowManager:
         except Exception as e:
             logger.error(f"{FLOWMSG}: Error loading config from {conf_file}: {e}")
             return {}
+        
+        

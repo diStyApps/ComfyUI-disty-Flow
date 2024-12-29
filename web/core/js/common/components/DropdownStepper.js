@@ -1,5 +1,26 @@
 import Dropdown from './Dropdown.js';
 import StepperComponent from './Stepper.js';
+function fixUrlPathsParam(originalUrl) {
+    if (!originalUrl) return originalUrl;
+
+    const idx = originalUrl.indexOf('?paths=');
+    if (idx === -1) {
+        return originalUrl;
+    }
+
+    const baseUrl = originalUrl.slice(0, idx + 7);
+    const pathsPart = originalUrl.slice(idx + 7); 
+    let decoded = decodeURIComponent(pathsPart);
+    const items = decoded.split(',');
+    const cleanedItems = items.map(item => {
+        return encodeURIComponent(item)
+            .replace(/%2F/g, '/');
+    });
+
+    const final = cleanedItems.join(',');
+    const fixedUrl = baseUrl + final;
+    return fixedUrl;
+}
 
 class DropdownStepper {
     constructor(config, workflow) {
@@ -14,13 +35,12 @@ class DropdownStepper {
 
         this.createDropdown();
         this.createSteppers();
-        // console.log('DropdownStepper initialized:', config);
     }
 
     createDropdown() {
         const dropdownContainer = document.createElement('div');
         dropdownContainer.id = `${this.config.id}-dropdown`;
-        dropdownContainer.className = 'dropdown-container';
+        dropdownContainer.className = 'dropdown-container'; 
         this.container.appendChild(dropdownContainer);
 
         const dropdownConfig = {
@@ -29,6 +49,9 @@ class DropdownStepper {
             label: this.config.label
         };
 
+        if (dropdownConfig.url) {
+            dropdownConfig.url = fixUrlPathsParam(dropdownConfig.url);
+        }
         new Dropdown(dropdownConfig, this.workflow);
     }
 
@@ -44,12 +67,22 @@ class DropdownStepper {
             stepperContainer.id = stepperId;
             stepperContainer.className = 'stepper-container';
             steppersContainer.appendChild(stepperContainer);
-
             const stepperConfigWithDefaults = {
                 ...stepperConfig,
                 id: stepperContainer.id,
-                precision: stepperConfig.precision !== undefined ? stepperConfig.precision : 2,
-                scaleFactor: stepperConfig.scaleFactor !== undefined ? stepperConfig.scaleFactor : Math.pow(10, stepperConfig.precision !== undefined ? stepperConfig.precision : 2)
+                precision:
+                    stepperConfig.precision !== undefined
+                        ? stepperConfig.precision
+                        : 2,
+                scaleFactor:
+                    stepperConfig.scaleFactor !== undefined
+                        ? stepperConfig.scaleFactor
+                        : Math.pow(
+                              10,
+                              stepperConfig.precision !== undefined
+                                  ? stepperConfig.precision
+                                  : 2
+                          )
             };
 
             const stepper = new StepperComponent(stepperConfigWithDefaults, this.workflow);

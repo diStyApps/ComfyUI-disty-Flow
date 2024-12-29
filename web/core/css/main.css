@@ -1185,6 +1185,7 @@ button:hover {
 #side-workflow-controls,
 #load-image-container,
 #custom-theme-modal,
+.dropdownDialogContainer,
 .aspect-ratio-selector,
 .content { 
     scrollbar-width: thin;
@@ -2520,5 +2521,289 @@ html:not(.css-loading) body {
         flex: none;
         min-width: 80px;
     }
+}
+
+.dropdownDialogContainer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border);
+    width: 60%;
+    height: 80%;
+
+    max-height: 80vh;
+    color: var(--color-button-primary-text);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 16px var(--color-background-secondary);
+    overflow: hidden; 
+}
+
+.dropdownDialogTitleBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    border-bottom: 1px dashed var(--color-border);
+    background-color: var(--color-header-background);
+}
+
+.dropdownDialogTitleText {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.dropdownDialogCloseButton {
+    margin-left: 8px;
+    background-color: var(--color-button-primary);
+    color: var(--color-button-primary-text);
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.dropdownDialogTopControls {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--color-header-background);
+    padding: 8px 16px;
+    border-bottom: 1px dashed var(--color-border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dropdownDialogSearchInput {
+    flex: 1;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-button-primary-text);
+}
+
+.dropdownDialogCheckboxLabel {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.dropdownDialogCheckboxLabel input[type="checkbox"] {
+    margin-right: 4px;
+}
+
+.dropdownDialogNestingTriggerLabel {
+    font-size: 14px;
+}
+
+.dropdownDialogNestingTriggerInput {
+    width: 20px;
+    margin-left: 4px;
+    padding: 2px 4px;
+    border: none;
+    background: #333;
+    color: var(--color-primary-text);
+}
+
+.dropdownDialogScrollableListContainer {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px 16px;
+}
+
+.dropdownDialogListContainer {
+    margin: 0;
+    padding: 0;
+}
+
+.dropdownItemCard,
+.dropdownFolderCard {
+    border-bottom: 1px dashed var(--color-border);
+    background-color: var(--color-background-secondary);
+    padding: 8px;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.dropdownItemCard:hover,
+.dropdownFolderCard:hover {
+    background-color: var(--color-background-pattern);
+}
+
+.dropdownCardTopRow {
+    display: flex;
+    align-items: center;
+}
+
+.dropdownCardImage {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    margin-right: 12px;
+}
+
+.dropdownCardTitle {
+    font-size: 1.3rem; 
+    font-weight: 600;
+    line-height: 1.4; 
+    letter-spacing: 0.02em; 
+    color: var(--color-primary-text);
+    text-transform: uppercase ;
+}
+
+.dropdownCardSubtext {
+    font-size: 12px;
+    color: var(--color-primary-text);
+    margin-top: 4px;
+}
+
+.dropdownFolderIcon {
+    margin-right: 8px;
+    width: 50px;
+    height: 50px;
+    color: var(--color-primary-text);
+}
+
+.dropdownFolderTitle {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--color-button-primary-text);
+}
+
+.dropdownFolderPath {
+    font-size: 12px;
+    color: var(--color-primary-text);
+    margin-top: 4px;
+}
+
+.dropdownSubList {
+    margin-top: 8px;
+    padding-left: 16px;
+    border-left: 1px solid rgba(255,255,255,0.2);
+    display: none; 
+}
+
+.drop-down-element {
+    display: flex;
+    align-items: center;
+    gap: 8px; 
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    width: 100%;
+    padding: 8px; 
+    justify-content: space-between; 
+}
+.drop-down-element:hover,
+.drop-down-element input[type="text"]:hover,
+.drop-down-element label:hover {
+    cursor: pointer;
+}
+
+.drop-down-element label {
+    flex: 1;
+    width: 100%;
+    
+}
+
+.drop-down-element input[type="text"] {
+    flex: 2;
+    width: 100%;
+    border: none;
+    background-color: var(--color-background-secondary);
+    padding: 4px 8px;
+}
+
+
+.drop-down-element input[type="text"]::placeholder {
+    /* color: var(--color-primary-text); */
+}
+
+.dropdownDialogContainer.leanListMode {
+    width: auto; 
+    max-width: 300px;
+    height: auto; 
+    max-height: 600px; 
+    transform: none; 
+}
+
+.leanListItem {
+    list-style: none;
+    background-color: var(--color-background-secondary);
+    padding: 8px;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.leanListItem:hover {
+    background-color: #363636;
+}
+
+.leanListItem-hover {
+    background-color: #363636 !important;
+}
+
+.leanListItem-selected {
+    background-color: var(--color-background-pattern) !important;
+}
+
+.modelPreviewContextMenu {
+    border-radius: 4px;
+}
+
+.contextMenuOption {
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.contextMenuOption:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.drag-over {
+    border: 2px dashed var(--color-border);
+}
+
+.drop-down-element .dropdownElementPreviewImage {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    margin-left: 8px;
+    border-radius: 2px;
+    /* background-color: transparent; */
+}
+.selected-item-scroll {
+    animation: highlight 0.1s ease-in-out;
+}
+
+@keyframes highlight {
+    from {
+        background-color: rgba(0, 255, 0, 0.3);
+    }
+    to {
+        background-color: transparent;
+    }
+}
+
+
+.drop-down-element.invalid {
+    background-color: #ff4444;
+    color: #fff;
+}
+.drop-down-element.invalid label {
+    width: 100%;
+    color: white;
+}
+
+.drop-down-element.invalid input[type="text"] {
+    width: 100%;
+    color: white;
+    background-color: #ff4444;
 }
 
