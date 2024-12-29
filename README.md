@@ -129,8 +129,8 @@ http://127.0.0.1:8188/flow
 
 ### Media and Model Management
 - [ ] Media Gallery Integration
-- [ ] Model Gallery Integration
-
+- [x] Model Gallery Integration
+- - Improved Model Gallery
 ### Pre-built Flows
 - Exclusive Flows for various tasks
   - Task-specific Flows

@@ -3,7 +3,7 @@ import mimetypes
 from pathlib import Path
 import re
 APP_NAME = "Flow"
-APP_VERSION = "0.5.0" 
+APP_VERSION = "0.5.1" 
 FLOWMSG = f"\033[38;5;129mFlow - {APP_VERSION}\033[0m"
 APP_CONFIGS = []
 
