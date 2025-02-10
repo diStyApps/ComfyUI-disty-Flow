@@ -15,7 +15,7 @@ def download_update_flows() -> None:
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             temp_repo_path = Path(tmpdirname) / "Flows"
-            logger.info(f"{FLOWMSG}: Downloading and Upading Flows")
+            logger.info(f"{FLOWMSG}: Downloading and Updating Flows")
 
             result = subprocess.run(
                 ['git', 'clone', FLOWS_DOWNLOAD_PATH, str(temp_repo_path)],
