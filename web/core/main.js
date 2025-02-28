@@ -145,25 +145,42 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
             return;
         }
         const promptsContainer = document.getElementById('prompts');
+        promptsContainer.innerHTML = ''; // Clear existing content
+
         config.prompts.forEach((input, index) => {
-            const titleDiv = document.createElement('div');
-            titleDiv.id = 'prompt';
+            const promptWrapper = document.createElement('div');
+            promptWrapper.className = 'prompt-wrapper';
     
             const labelDiv = document.createElement('div');
-            labelDiv.id = 'title-text';
+            labelDiv.className = 'title-text';
             labelDiv.textContent = input.label;
     
             const textArea = document.createElement('textarea');
             textArea.id = input.id;
-    
+            textArea.rows = 5; // Multiline textarea
+            textArea.placeholder = 'Enter multiple prompts, one per line';
             if (options.clearInputs) {
                 textArea.value = '';
             } else {
                 textArea.value = input.default || generateDynamicScriptDefault(index);
             }
-            titleDiv.appendChild(labelDiv);
-            titleDiv.appendChild(textArea);
-            promptsContainer.appendChild(titleDiv);
+
+            // Add batch processing toggle
+            const batchToggleWrapper = document.createElement('div');
+            batchToggleWrapper.className = 'batch-toggle-wrapper';
+            const batchToggleLabel = document.createElement('label');
+            batchToggleLabel.textContent = 'Batch Process (one image per line)';
+            const batchToggle = document.createElement('input');
+            batchToggle.type = 'checkbox';
+            batchToggle.id = `${input.id}-batch-toggle`;
+            batchToggle.checked = false; // Default to single prompt mode
+            batchToggleLabel.appendChild(batchToggle);
+            batchToggleWrapper.appendChild(batchToggleLabel);
+
+            promptWrapper.appendChild(labelDiv);
+            promptWrapper.appendChild(textArea);
+            promptWrapper.appendChild(batchToggleWrapper);
+            promptsContainer.appendChild(promptWrapper);
         });
     }
 
@@ -262,7 +279,7 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
 
 
     async function queue() {   
-        console.log("Queueing new job");
+        console.log("Queueing new jobs");
 
         if (canvasLoader && canvasLoader.isInitialized) {
             await CanvasComponent(flowConfig, workflow, canvasLoader);
@@ -275,20 +292,45 @@ import { store } from  './js/common/scripts/stateManagerMain.js';
         if (flowConfig.prompts) {
             flowConfig.prompts.forEach(pathConfig => {
                 const { id } = pathConfig;
-                const element = document.getElementById(id);
-                if (element) {
-                    const value = element.value.replace(/(\r\n|\n|\r)/gm, " ");
-                    updateWorkflowValue(workflow, id, value, flowConfig);
+                const textArea = document.getElementById(id);
+                const batchToggle = document.getElementById(`${id}-batch-toggle`);
+                if (!textArea) {
+                    console.warn(`Textarea not found for ID: ${id}`);
+                    return;
+                }
+
+                const rawValue = textArea.value.trim();
+                if (batchToggle && batchToggle.checked) {
+                    // Batch mode: split by lines and queue each as a separate job
+                    const prompts = rawValue.split(/\r\n|\n|\r/)
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0); // Remove empty lines
+
+                    if (prompts.length === 0) {
+                        console.warn(`No valid prompts found for ID: ${id}`);
+                        return;
+        }
+
+                    prompts.forEach((prompt, index) => {
+                        const jobWorkflow = JSON.parse(JSON.stringify(workflow)); // Deep clone
+                        updateWorkflowValue(jobWorkflow, id, prompt, flowConfig);
+                        const jobId = StateManager.incrementJobId();
+                        const job = { id: jobId, workflow: jobWorkflow };
+                        StateManager.addJob(job);
+                        console.log(`Added batch job ${index + 1}/${prompts.length}. Job ID: ${jobId}, Prompt: "${prompt}"`);
+                    });
                 } else {
-                    console.warn(`Element not found for ID: ${id}`);
+                    // Single mode: treat as one job
+                    const singlePrompt = rawValue.replace(/(\r\n|\n|\r)/gm, " ");
+                    updateWorkflowValue(workflow, id, singlePrompt, flowConfig);
+        const jobId = StateManager.incrementJobId();
+        const job = { id: jobId, workflow: { ...workflow } };
+        StateManager.addJob(job);
+                    console.log(`Added single job. Job ID: ${jobId}, Prompt: "${singlePrompt}"`);
                 }
             });
         }
 
-        const jobId = StateManager.incrementJobId();
-        const job = { id: jobId, workflow: { ...workflow } };
-        StateManager.addJob(job);
-        console.log(`Added job to queue. Job ID: ${jobId}`);
         console.log("Current queue:", StateManager.getJobQueue());
         console.log("queued workflow:", workflow);        
         store.dispatch({
