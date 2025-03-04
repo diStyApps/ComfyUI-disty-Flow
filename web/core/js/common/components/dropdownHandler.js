@@ -1,5 +1,7 @@
 import { updateWorkflow, getValueFromWorkflow } from './workflowManager.js';
 
+const path_separator = navigator.platform.startsWith('Win') ? '\\' : '/';
+
 const ADVANCED_WORKFLOW_PATHS = [
     'ckpt_name',
     'vae_name',
@@ -112,7 +114,7 @@ function gatherLeafPaths(nestedBranch, parentPath) {
     const results = [];
     for (const key of Object.keys(nestedBranch)) {
         const val = nestedBranch[key];
-        const childPath = parentPath ? `${parentPath}\\${key}` : key;
+        const childPath = parentPath ? `${parentPath}${path_separator}${key}` : key;
         if (val._isLeaf) {
             results.push(childPath);
         } else {
@@ -185,7 +187,7 @@ function createNestedList(nestedData, parentUl, parentPath, handleSelection, get
     const leafKeys = allKeys.filter(k => nestedData[k]._isLeaf);
 
     folderKeys.forEach(key => {
-        const currentPath = parentPath ? `${parentPath}\\${key}` : key;
+        const currentPath = parentPath ? `${parentPath}${path_separator}${key}` : key;
         const folderHtml = `
           <li>
             <div class="dropdownFolderCard">
@@ -237,7 +239,7 @@ function createNestedList(nestedData, parentUl, parentPath, handleSelection, get
     });
 
     leafKeys.forEach(key => {
-        const currentPath = parentPath ? `${parentPath}\\${key}` : key;
+        const currentPath = parentPath ? `${parentPath}${path_separator}${key}` : key;
         const mk = pathToKey(currentPath);
         const liHtml = `
           <li class="dropdownItemCard" data-model-path="${currentPath}">
